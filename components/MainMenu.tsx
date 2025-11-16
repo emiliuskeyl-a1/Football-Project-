@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppMode } from '../types';
+import { AppMode } from '../types.ts';
 
 interface MainMenuProps {
   onModeSelect: (mode: AppMode) => void;

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { PlayDiagram } from './PlayDiagram';
-import { Play, ConceptLibrary, RouteLibrary, RoutePath } from '../types';
-import { FORMATIONS } from '../constants';
+import { PlayDiagram } from './PlayDiagram.tsx';
+import { Play, ConceptLibrary, RouteLibrary, RoutePath } from '../types.ts';
+import { FORMATIONS } from '../constants.ts';
 
 interface StudyViewProps {
   conceptLibrary: ConceptLibrary;

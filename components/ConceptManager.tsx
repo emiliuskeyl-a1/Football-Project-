@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ConceptLibrary, ConceptDefinition } from '../types';
+import { ConceptLibrary, ConceptDefinition } from '../types.ts';
 
 interface ConceptManagerProps {
   isOpen: boolean;

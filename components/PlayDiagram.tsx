@@ -1,5 +1,6 @@
 import React from 'react';
-import { Play, Point } from '../types';
+import { Play, Point } from '../types.ts';
+import { FORMATIONS } from '../constants.ts';
 
 interface PlayDiagramProps {
   play: Play;
@@ -130,7 +131,3 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
     </div>
   );
 };
-
-// We need to define FORMATIONS here as well for the component to use it
-// In a larger app, this might come from a shared context or props
-import { FORMATIONS } from '../constants';

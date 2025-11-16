@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ConceptManager } from './components/ConceptManager';
-import { MainMenu } from './components/MainMenu';
-import { GeneratorView } from './components/GeneratorView';
-import { StudyView } from './components/StudyView';
-import { Play, ConceptLibrary, ConceptDefinition, AppMode } from './types';
-import { generatePlay } from './services/playbookService';
-import { CONCEPT_ROUTES, ROUTE_LIBRARY } from './constants';
+import { ConceptManager } from './components/ConceptManager.tsx';
+import { MainMenu } from './components/MainMenu.tsx';
+import { GeneratorView } from './components/GeneratorView.tsx';
+import { StudyView } from './components/StudyView.tsx';
+import { Play, ConceptLibrary, ConceptDefinition, AppMode } from './types.ts';
+import { generatePlay } from './services/playbookService.ts';
+import { CONCEPT_ROUTES, ROUTE_LIBRARY } from './constants.ts';
 
 const App: React.FC = () => {
   const [appMode, setAppMode] = useState<AppMode>('mainMenu');

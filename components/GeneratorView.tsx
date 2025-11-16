@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { PlayDiagram } from './PlayDiagram';
-import { Play, ConceptLibrary } from '../types';
-import { generatePlay } from '../services/playbookService';
-import { ROUTE_LIBRARY } from '../constants';
+import { PlayDiagram } from './PlayDiagram.tsx';
+import { Play, ConceptLibrary } from '../types.ts';
+import { generatePlay } from '../services/playbookService.ts';
+import { ROUTE_LIBRARY } from '../constants.ts';
 
 interface GeneratorViewProps {
   conceptLibrary: ConceptLibrary;
