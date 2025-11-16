@@ -1,0 +1,5 @@
+{
+  "name": "Football Playbook Generator",
+  "description": "A web application to randomly generate and visualize American football offensive plays. See formations, player routes, and concepts on a dynamic play diagram.",
+  "requestFramePermissions": []
+}
