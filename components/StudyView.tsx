@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { PlayDiagram } from './PlayDiagram.tsx';
-import { Play, ConceptLibrary, RouteLibrary } from '../types.ts';
-import { FORMATIONS } from '../constants.ts';
+import { PlayDiagram } from './PlayDiagram';
+import { Play, ConceptLibrary, RouteLibrary, RoutePath } from '../types';
+import { FORMATIONS } from '../constants';
 
 interface StudyViewProps {
   conceptLibrary: ConceptLibrary;
@@ -18,8 +18,13 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
   const sortedRoutes = useMemo(() => Object.keys(routeLibrary).sort(), [routeLibrary]);
   const sortedConcepts = useMemo(() => Object.keys(conceptLibrary).sort(), [conceptLibrary]);
 
+  // Set default selection when mode changes
   React.useEffect(() => {
-    setSelectedItem(studyMode === 'routes' ? sortedRoutes[0] || '' : sortedConcepts[0] || '');
+    if (studyMode === 'routes') {
+      setSelectedItem(sortedRoutes[0] || '');
+    } else {
+      setSelectedItem(sortedConcepts[0] || '');
+    }
   }, [studyMode, sortedRoutes, sortedConcepts]);
 
   const studyPlay: Play | null = useMemo(() => {
@@ -30,8 +35,10 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       if (!path) return null;
       return {
         playcall: `Route: ${selectedItem}`,
-        formationName: 'Spread',
-        routes: { 'Z': { routeName: selectedItem, path: path } }
+        formationName: 'Spread', // Use a default formation for display
+        routes: {
+          'Z': { routeName: selectedItem, path: path }
+        }
       };
     }
 
@@ -40,18 +47,16 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       if (!concept) return null;
       
       const formation = FORMATIONS['Spread'];
-      // Use the number of routes defined in the concept to determine receivers
-      const numReceivers = concept.routes.length;
-      const receivers = ['Z', 'H', 'S', 'W'].slice(0, numReceivers); 
+      const rightReceivers = ['Z', 'H']; // Display on 2 right-side receivers in Spread
       const assignments: Play['routes'] = {};
       
-      receivers.forEach((receiver, i) => {
+      for (let i = 0; i < rightReceivers.length; i++) {
+        const receiver = rightReceivers[i];
         const routeName = concept.routes[i];
         if (routeName && routeLibrary[routeName]) {
-          // Display all routes as if on the right side for simplicity
           assignments[receiver] = { routeName, path: routeLibrary[routeName] };
         }
-      });
+      }
       
       return {
         playcall: `Concept: ${selectedItem}`,
@@ -59,6 +64,7 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
         routes: assignments
       };
     }
+
     return null;
   }, [selectedItem, studyMode, routeLibrary, conceptLibrary]);
 
@@ -69,25 +75,31 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
   const options = studyMode === 'routes' ? sortedRoutes : sortedConcepts;
 
   return (
-    <div className="w-full max-w-6xl mx-auto flex flex-col" style={{height: 'calc(100vh - 2rem)'}}>
-       <header className="w-full text-center mb-4 flex justify-between items-center flex-shrink-0">
-         <button onClick={onBackToMenu} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
-            &larr; Menu
-         </button>
-         <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-            Study Room
-        </h1>
-        <div className="w-24"></div>
+    <div className="w-full h-full flex flex-col">
+      <header className="w-full max-w-5xl text-center mb-4 md:mb-6">
+        <div className="flex justify-between items-center">
+          <div className="w-1/3 flex justify-start">
+            <button onClick={onBackToMenu} className="bg-gray-700 hover:bg-gray-600 text-yellow-300 font-bold py-2 px-4 rounded-lg text-sm transition-colors duration-200">
+              &larr; Main Menu
+            </button>
+          </div>
+          <div className="w-1/3">
+            <h1 className="text-3xl md:text-5xl font-bold text-blue-400 tracking-wider">
+              Study Room
+            </h1>
+          </div>
+          <div className="w-1/3"></div>
+        </div>
       </header>
 
-      <main className="w-full flex-grow flex flex-col items-center bg-gray-50 rounded-2xl shadow-2xl p-4 sm:p-6">
-        <div className="w-full max-w-lg bg-gray-100 p-2 rounded-xl mb-4 flex items-center space-x-2 border border-gray-200">
-           <div className="flex-1">
-             <div className="flex space-x-1 bg-gray-300 rounded-lg p-1">
-                <button onClick={() => setStudyMode('routes')} className={`w-full py-2 rounded-md text-sm font-bold transition-all ${studyMode === 'routes' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>
+      <main className="w-full max-w-5xl flex-grow flex flex-col items-center bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6">
+        <div className="w-full md:w-2/3 lg:w-1/2 bg-gray-900 p-3 rounded-lg mb-4 flex items-center space-x-4">
+          <div className="flex-1">
+             <div className="flex space-x-1 bg-gray-700 rounded-lg p-1">
+                <button onClick={() => setStudyMode('routes')} className={`w-full py-2 rounded-md text-sm font-bold transition-colors ${studyMode === 'routes' ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-600'}`}>
                     Routes
                 </button>
-                <button onClick={() => setStudyMode('concepts')} className={`w-full py-2 rounded-md text-sm font-bold transition-all ${studyMode === 'concepts' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-200'}`}>
+                <button onClick={() => setStudyMode('concepts')} className={`w-full py-2 rounded-md text-sm font-bold transition-colors ${studyMode === 'concepts' ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-600'}`}>
                     Concepts
                 </button>
              </div>
@@ -96,19 +108,19 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
             <select
                 value={selectedItem}
                 onChange={handleSelectionChange}
-                className="w-full bg-white border-2 border-gray-200 rounded-lg px-3 py-2 text-gray-800 focus:ring-blue-500 focus:border-blue-500 h-full transition-colors"
+                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500 h-full"
             >
                 {options.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </div>
         </div>
 
-        <div className="w-full flex-grow relative">
+        <div className="w-full flex-grow aspect-[16/10] md:aspect-[16/9] relative">
           {studyPlay ? (
             <PlayDiagram play={studyPlay} />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
-              <p className="text-gray-500">Select an item to view.</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-lg">
+              <p>Select an item to view.</p>
             </div>
           )}
         </div>

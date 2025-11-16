@@ -1,9 +1,9 @@
-import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition } from '../types.ts';
+import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition } from '../types';
 import { 
     ROUTE_LIBRARY, 
     FORMATIONS,
     PLAYS_ONE_REC,
-} from '../constants.ts';
+} from '../constants';
 
 const FORMATION_NAMES = Object.keys(FORMATIONS);
 

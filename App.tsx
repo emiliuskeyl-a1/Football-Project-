@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ConceptManager } from './components/ConceptManager.tsx';
-import { MainMenu } from './components/MainMenu.tsx';
-import { GeneratorView } from './components/GeneratorView.tsx';
-import { StudyView } from './components/StudyView.tsx';
-import { Play, ConceptLibrary, ConceptDefinition, AppMode } from './types.ts';
-import { generatePlay } from './services/playbookService.ts';
-import { CONCEPT_ROUTES, ROUTE_LIBRARY } from './constants.ts';
+import { ConceptManager } from './components/ConceptManager';
+import { MainMenu } from './components/MainMenu';
+import { GeneratorView } from './components/GeneratorView';
+import { StudyView } from './components/StudyView';
+import { Play, ConceptLibrary, ConceptDefinition, AppMode } from './types';
+import { generatePlay } from './services/playbookService';
+import { CONCEPT_ROUTES, ROUTE_LIBRARY } from './constants';
 
 const App: React.FC = () => {
   const [appMode, setAppMode] = useState<AppMode>('mainMenu');
@@ -88,29 +88,28 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-800 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans">
       {renderContent()}
       
       {isPasswordPromptOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Enter Password</h2>
-            <p className="text-gray-600 mb-6">Access to the Concept Manager is restricted.</p>
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h2 className="text-xl font-bold text-yellow-300 mb-4">Enter Password</h2>
+            <p className="text-gray-400 mb-4">Please enter the password to access the Concept Manager.</p>
             <form onSubmit={handlePasswordSubmit}>
               <input
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full bg-gray-100 border-2 border-gray-200 rounded-lg px-4 py-3 text-gray-800 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 mb-2 transition-colors"
-                placeholder="Password..."
+                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500 mb-2"
                 autoFocus
               />
-              {passwordError && <p className="text-red-500 text-sm mb-4">{passwordError}</p>}
-              <div className="flex justify-end space-x-3 mt-6">
-                <button type="button" onClick={() => setIsPasswordPromptOpen(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-5 rounded-lg transition-colors">
+              {passwordError && <p className="text-red-400 text-sm mb-4">{passwordError}</p>}
+              <div className="flex justify-end space-x-2 mt-4">
+                <button type="button" onClick={() => setIsPasswordPromptOpen(false)} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                   Cancel
                 </button>
-                <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg transition-colors shadow-md hover:shadow-lg">
+                <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                   Submit
                 </button>
               </div>

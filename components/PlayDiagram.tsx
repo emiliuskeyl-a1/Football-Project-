@@ -1,6 +1,5 @@
 import React from 'react';
-import { Play, Point } from '../types.ts';
-import { FORMATIONS } from '../constants.ts';
+import { Play, Point } from '../types';
 
 interface PlayDiagramProps {
   play: Play;
@@ -11,22 +10,10 @@ const FIELD_HEIGHT = 600;
 const YARD_SCALE = FIELD_HEIGHT / 53.3; // Standard field width
 
 const Player: React.FC<{ position: Point; label: string }> = ({ position, label }) => {
-  const isOffense = ['W', 'S', 'H', 'Z', 'QB'].includes(label);
-  const isCenter = label === 'C';
-
-  let symbol;
-  if (isCenter) {
-    symbol = <rect x="-12" y="-12" width="24" height="24" rx="4" fill="#374151" />;
-  } else if (isOffense) {
-    symbol = <circle cx="0" cy="0" r="14" fill="white" stroke="#3b82f6" strokeWidth="4" />;
-  } else { // Generic or defense
-    symbol = <path d="M -10 -10 L 10 10 M -10 10 L 10 -10" stroke="#ef4444" strokeWidth="4" />;
-  }
-
   return (
     <g transform={`translate(${position.x}, ${position.y})`}>
-      {symbol}
-      <text x="0" y="5" textAnchor="middle" fill={isCenter ? "white" : "#1f2937"} fontSize="14" fontWeight="bold">
+      <circle cx="0" cy="0" r="14" fill="#fef08a" stroke="#4b5563" strokeWidth="2" />
+      <text x="0" y="5" textAnchor="middle" fill="#1f2937" fontSize="14" fontWeight="bold">
         {label}
       </text>
     </g>
@@ -54,7 +41,7 @@ const RoutePath: React.FC<{ startPos: Point; path: Point[]; color: string; route
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
-      markerEnd={hasArrow ? `url(#arrowhead-${color})` : "none"}
+      markerEnd={hasArrow ? "url(#arrowhead)" : "none"}
     />
   );
 };
@@ -63,36 +50,30 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
   const { formationName, routes } = play;
   const formation = FORMATIONS[formationName];
 
-  const colors = ["#3b82f6", "#ef4444", "#10b981", "#f97316", "#8b5cf6"];
+  const colors = ["#6ee7b7", "#f87171", "#60a5fa", "#facc15", "#c084fc"];
 
   return (
-    <div className="w-full h-full bg-white rounded-lg overflow-hidden relative shadow-inner">
+    <div className="w-full h-full bg-[#1e40af] rounded-lg overflow-hidden relative">
       <svg
         viewBox={`0 50 ${FIELD_WIDTH} ${FIELD_HEIGHT - 100}`}
         preserveAspectRatio="xMidYMid meet"
         className="w-full h-full"
       >
         <defs>
-          {colors.map(color => (
-            <marker
-                key={color}
-                id={`arrowhead-${color}`}
-                markerWidth="8"
-                markerHeight="6"
-                refX="5"
-                refY="3"
-                orient="auto"
-              >
-              <polygon points="0 0, 8 3, 0 6" fill={color} />
-            </marker>
-          ))}
+          <marker
+            id="arrowhead"
+            markerWidth="6"
+            markerHeight="4"
+            refX="4"
+            refY="2"
+            orient="auto"
+          >
+            <polygon points="0 0, 6 2, 0 4" fill="#fef08a" />
+          </marker>
         </defs>
-        
-        {/* Background */}
-        <rect x="0" y="0" width={FIELD_WIDTH} height={FIELD_HEIGHT} fill="white" />
 
         {/* Field Markings */}
-        <g stroke="#d1d5db" strokeOpacity="0.8" strokeWidth="2">
+        <g stroke="#FFF" strokeOpacity="0.5" strokeWidth="2">
           {/* Horizontal Yard lines */}
           {Array.from({ length: 12 }).map((_, i) => {
             const y = (FIELD_HEIGHT / 11) * i;
@@ -102,9 +83,27 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
              return null;
           })}
           {/* Vertical Hash marks */}
-          <line x1={FIELD_WIDTH / 3} y1="0" x2={FIELD_WIDTH / 3} y2={FIELD_HEIGHT} strokeDasharray="2 6" />
-          <line x1={(FIELD_WIDTH * 2) / 3} y1="0" x2={(FIELD_WIDTH * 2) / 3} y2={FIELD_HEIGHT} strokeDasharray="2 6" />
+          <line x1={FIELD_WIDTH / 3} y1="0" x2={FIELD_WIDTH / 3} y2={FIELD_HEIGHT} strokeDasharray="4 8" />
+          <line x1={(FIELD_WIDTH * 2) / 3} y1="0" x2={(FIELD_WIDTH * 2) / 3} y2={FIELD_HEIGHT} strokeDasharray="4 8" />
         </g>
+
+        {/* Center Field Logo */}
+        <text
+          x={FIELD_WIDTH / 2}
+          y={FIELD_HEIGHT / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#1e3a8a"
+          stroke="#facc15"
+          strokeWidth="3"
+          fontSize="120"
+          fontWeight="900"
+          letterSpacing="0.05em"
+          opacity="0.3"
+          style={{ pointerEvents: 'none' }}
+        >
+            RUTLAND
+        </text>
         
         {/* Center & QB */}
         <Player position={{x: FIELD_WIDTH / 2, y: (FIELD_HEIGHT * 80) / 100}} label="C" />
@@ -131,3 +130,7 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
     </div>
   );
 };
+
+// We need to define FORMATIONS here as well for the component to use it
+// In a larger app, this might come from a shared context or props
+import { FORMATIONS } from '../constants';

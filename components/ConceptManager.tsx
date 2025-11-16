@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ConceptLibrary, ConceptDefinition } from '../types.ts';
+import { ConceptLibrary, ConceptDefinition } from '../types';
 
 interface ConceptManagerProps {
   isOpen: boolean;
@@ -63,51 +63,51 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
   const visibleSelectors = getVisibleRouteSelectors();
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-        <header className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-          <h2 className="text-2xl font-bold text-gray-900">Concept Manager</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-800 text-3xl transition-colors">&times;</button>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+      <div className="bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <header className="p-4 border-b border-gray-700 flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-blue-400">Concept Manager</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl">&times;</button>
         </header>
 
-        <div className="p-4 sm:p-6 flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="p-6 flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Column 1: Add New Concept */}
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">Add New Concept</h3>
+          <div className="bg-gray-900 p-4 rounded-lg">
+            <h3 className="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Add New Concept</h3>
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <FormInput id="concept-name" label="Concept Name" value={newConceptName} onChange={setNewConceptName} placeholder="e.g., Dagger" required />
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Concept Category</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value as ConceptDefinition['category'])} className="w-full bg-white border-2 border-gray-200 rounded-lg px-3 py-2 text-gray-800 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                <label className="block text-sm font-medium text-gray-300 mb-1">Concept Category</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value as ConceptDefinition['category'])} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500">
                     {Object.entries(categoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                 </select>
               </div>
 
-              <p className="text-sm text-gray-500">Define routes from outside-in (Right side first):</p>
+              <p className="text-sm text-gray-400">Define routes from right to left (Spread Form):</p>
               
-              {visibleSelectors >= 1 && <RouteSelect label="Receiver 1" value={zRoute} onChange={setZRoute} allRoutes={allRoutes} />}
-              {visibleSelectors >= 2 && <RouteSelect label="Receiver 2" value={hRoute} onChange={setHRoute} allRoutes={allRoutes} />}
-              {visibleSelectors >= 3 && <RouteSelect label="Receiver 3" value={sRoute} onChange={setSRoute} allRoutes={allRoutes} />}
-              {visibleSelectors >= 4 && <RouteSelect label="Receiver 4" value={wRoute} onChange={setWRoute} allRoutes={allRoutes} />}
+              {visibleSelectors >= 1 && <RouteSelect label="Far Right (Z)" value={zRoute} onChange={setZRoute} allRoutes={allRoutes} />}
+              {visibleSelectors >= 2 && <RouteSelect label="Right Slot (H)" value={hRoute} onChange={setHRoute} allRoutes={allRoutes} />}
+              {visibleSelectors >= 3 && <RouteSelect label="Left Slot (S)" value={sRoute} onChange={setSRoute} allRoutes={allRoutes} />}
+              {visibleSelectors >= 4 && <RouteSelect label="Far Left (W)" value={wRoute} onChange={setWRoute} allRoutes={allRoutes} />}
               
-              <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg">
+              <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                 Add Concept
               </button>
             </form>
           </div>
 
           {/* Column 2: Existing Concepts */}
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col">
-             <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">Existing Concepts</h3>
-             <ul className="space-y-2 flex-grow overflow-y-auto pr-2 -mr-2">
+          <div className="bg-gray-900 p-4 rounded-lg flex flex-col">
+             <h3 className="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Existing Concepts</h3>
+             <ul className="space-y-2 flex-grow overflow-y-auto pr-2">
                 {sortedConcepts.map(([name, concept]) => (
-                    <li key={name} className="bg-white p-3 rounded-lg flex justify-between items-center border border-gray-200">
+                    <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
                         <div>
-                            <p className="font-bold text-blue-600">{name}</p>
-                            <p className="text-xs text-gray-500 capitalize">{categoryLabels[concept.category]} - <span className="font-medium text-gray-700">{concept.routes.join(', ')}</span></p>
+                            <p className="font-bold text-blue-400">{name}</p>
+                            <p className="text-xs text-gray-400 capitalize">{concept.category} - {concept.routes.join(', ')}</p>
                         </div>
-                        <button onClick={() => onDeleteConcept(name)} className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-md transition-colors">
+                        <button onClick={() => onDeleteConcept(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">
                             Delete
                         </button>
                     </li>
@@ -124,7 +124,7 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
 const FormInput: React.FC<{id: string, label: string, value: string, onChange: (val: string) => void, type?: string, placeholder?: string, required?: boolean}> = 
 ({id, label, value, onChange, type = 'text', placeholder = '', required = false}) => (
     <div>
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+        <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
         <input
             id={id}
             type={type}
@@ -132,7 +132,7 @@ const FormInput: React.FC<{id: string, label: string, value: string, onChange: (
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
             required={required}
-            className="w-full bg-white border-2 border-gray-200 rounded-lg px-3 py-2 text-gray-800 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
         />
     </div>
 );
@@ -141,11 +141,11 @@ const FormInput: React.FC<{id: string, label: string, value: string, onChange: (
 // Helper component for route selection dropdown
 const RouteSelect: React.FC<{label: string, value: string, onChange: (val: string) => void, allRoutes: string[]}> = ({label, value, onChange, allRoutes}) => (
     <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+        <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
         <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full bg-white border-2 border-gray-200 rounded-lg px-3 py-2 text-gray-800 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
         >
             {allRoutes.map(route => (
                 <option key={route} value={route}>{route}</option>

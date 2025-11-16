@@ -1,4 +1,4 @@
-import { RouteLibrary, ConceptLibrary, FormationLibrary } from './types.ts';
+import { RouteLibrary, ConceptLibrary, FormationLibrary } from './types';
 
 // Coordinates are relative (in yards). X is horizontal, Y is vertical downfield.
 export const ROUTE_LIBRARY: RouteLibrary = {
