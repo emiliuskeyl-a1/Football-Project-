@@ -164,7 +164,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
       </header>
 
       <main className="w-full max-w-5xl flex-grow flex flex-col items-center bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6">
-        <div className="w-full bg-gray-900 p-3 rounded-lg mb-4 text-center min-h-[60px] flex items-center justify-center">
+        <div className="w-full bg-gray-900 p-3 rounded-lg text-center min-h-[60px] flex items-center justify-center mb-4">
             {displayMode === 'diagramOnly' && !isRevealed ? (
                  <button onClick={() => setIsRevealed(true)} className="text-yellow-400 font-bold animate-pulse">Click to Reveal Playcall</button>
             ) : (
@@ -184,9 +184,6 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
               {displayMode === 'playcallOnly' ? (
                 renderInteractiveQuiz()
               ) : (
-                // This now correctly handles 'both' and 'diagramOnly' modes.
-                // In 'diagramOnly', the playcall above is hidden until revealed,
-                // but the diagram is always visible.
                 <PlayDiagram play={currentPlay} />
               )}
             </>

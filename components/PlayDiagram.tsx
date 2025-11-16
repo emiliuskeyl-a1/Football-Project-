@@ -20,16 +20,18 @@ const Player: React.FC<{ position: Point; label: string }> = ({ position, label 
   );
 };
 
-const RoutePath: React.FC<{ startPos: Point; path: Point[]; color: string }> = ({ startPos, path, color }) => {
+const RoutePath: React.FC<{ startPos: Point; path: Point[]; color: string; routeName: string }> = ({ startPos, path, color, routeName }) => {
   if (!path || path.length === 0) return null;
 
   const pathData = path
     .map((p, i) => {
-      const x = startPos.x + p.x * YARD_SCALE; // Scale horizontal movement (FIXED: removed 0.7 multiplier)
-      const y = startPos.y - p.y * YARD_SCALE; // Y goes up
+      const x = startPos.x + p.x * YARD_SCALE;
+      const y = startPos.y - p.y * YARD_SCALE;
       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
     })
     .join(' ');
+  
+  const hasArrow = routeName !== 'Block';
 
   return (
     <path
@@ -39,7 +41,7 @@ const RoutePath: React.FC<{ startPos: Point; path: Point[]; color: string }> = (
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
-      markerEnd="url(#arrowhead)"
+      markerEnd={hasArrow ? "url(#arrowhead)" : "none"}
     />
   );
 };
@@ -97,7 +99,7 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
           fontSize="120"
           fontWeight="900"
           letterSpacing="0.05em"
-          opacity="0.35"
+          opacity="0.3"
           style={{ pointerEvents: 'none' }}
         >
             RUTLAND
@@ -119,7 +121,7 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
 
           return (
             <g key={receiver}>
-              <RoutePath startPos={startPos} path={routeInfo.path} color={colors[index % colors.length]} />
+              <RoutePath startPos={startPos} path={routeInfo.path} color={colors[index % colors.length]} routeName={routeInfo.routeName} />
               <Player position={startPos} label={receiver} />
             </g>
           );
