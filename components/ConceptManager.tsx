@@ -101,7 +101,8 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
           <div className="bg-gray-900 p-4 rounded-lg flex flex-col">
              <h3 className="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Existing Concepts</h3>
              <ul className="space-y-2 flex-grow overflow-y-auto pr-2">
-                {sortedConcepts.map(([name, concept]) => (
+                {/* FIX: Cast sortedConcepts to the correct type to resolve type inference issue. */}
+                {(sortedConcepts as [string, ConceptDefinition][]).map(([name, concept]) => (
                     <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
                         <div>
                             <p className="font-bold text-blue-400">{name}</p>
