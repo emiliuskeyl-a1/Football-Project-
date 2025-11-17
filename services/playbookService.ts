@@ -220,14 +220,10 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
             finalRoutes[insideLeft] = { routeName: 'Drag', path: routeLibrary['LDrag'] };
             finalRoutes[insideRight] = { routeName: 'Drag', path: routeLibrary['Drag'] };
         } else {
-            const allSortedReceivers = [...leftReceivers.sort((a,b) => finalFormation[a].x - finalFormation[b].x), ...rightReceivers.sort((a,b) => finalFormation[a].x - finalFormation[b].x)];
-            const assignments = assignRoutesToReceivers(conceptName, allSortedReceivers, true, conceptLibrary, routeLibrary);
-            leftReceivers.forEach(rec => {
-               if (assignments[rec]) {
-                   assignments[rec].path = getMirroredPath(assignments[rec].path);
-               }
-            });
-            finalRoutes = assignments;
+            // Refactored to use the simpler and more robust split-field assignment logic
+            const rightAssignments = assignRoutesToReceivers(conceptName, rightReceivers, true, conceptLibrary, routeLibrary);
+            const leftAssignments = assignRoutesToReceivers(conceptName, leftReceivers, false, conceptLibrary, routeLibrary);
+            finalRoutes = { ...rightAssignments, ...leftAssignments };
         }
 
     } else { 

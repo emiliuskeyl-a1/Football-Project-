@@ -12,6 +12,10 @@ interface StudyViewProps {
 
 type StudyMode = 'routes' | 'concepts' | 'motions';
 
+const getMirroredPath = (path: RoutePath): RoutePath => {
+    return path.map(point => ({ x: -point.x, y: point.y }));
+};
+
 export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibrary, motionLibrary, onBackToMenu }) => {
   const [studyMode, setStudyMode] = useState<StudyMode>('routes');
   const [selectedItem, setSelectedItem] = useState<string>('');
@@ -51,21 +55,39 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       const concept = conceptLibrary[selectedItem];
       if (!concept) return null;
       
-      const receivers = ['Z', 'H', 'S', 'W'];
+      let formationName = 'Spread';
       const assignments: Play['routes'] = {};
-      const numRoutes = concept.routes.length;
-      
-      for (let i = 0; i < numRoutes; i++) {
-        const receiver = receivers[i];
-        const routeName = concept.routes[i];
-        if (receiver && routeName && routeLibrary[routeName]) {
-          assignments[receiver] = { routeName, path: routeLibrary[routeName] };
-        }
+
+      if (concept.category === 'three') {
+        formationName = 'Tri';
+        const triReceivers = ['Z', 'H', 'S']; // The 3 receivers on the right in Tri, ordered right-to-left
+        concept.routes.forEach((routeName, i) => {
+            const receiver = triReceivers[i];
+            if (receiver && routeName && routeLibrary[routeName]) {
+                // All receivers are on the right, so no mirroring needed.
+                assignments[receiver] = { routeName, path: routeLibrary[routeName] };
+            }
+        });
+      } else {
+        // Default logic for 1, 2, and 4 receiver concepts using Spread
+        formationName = 'Spread';
+        const spreadReceivers = ['Z', 'H', 'S', 'W']; // Right to left
+        concept.routes.forEach((routeName, i) => {
+            const receiver = spreadReceivers[i];
+            if (receiver && routeName && routeLibrary[routeName]) {
+                let path = routeLibrary[routeName];
+                // Mirror for left-side receivers (S and W)
+                if (receiver === 'S' || receiver === 'W') {
+                    path = getMirroredPath(path);
+                }
+                assignments[receiver] = { routeName, path };
+            }
+        });
       }
       
       return {
         playcall: `Concept: ${selectedItem}`,
-        formationName: 'Spread',
+        formationName: formationName,
         routes: assignments,
         motions: [],
       };

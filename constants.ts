@@ -33,11 +33,12 @@ export const DEFAULT_ROUTE_LIBRARY: RouteLibrary = {
 
 export const DEFAULT_CONCEPT_LIBRARY: ConceptLibrary = {
     "Mesh": { routes: ["Out", "Drag", "LDrag", "LOut"], category: 'full' },
-    "Captain": { routes: ["Comeback", "Comeback", "Comeback", "Comeback"], category: 'full' },
+    "Captain (4)": { routes: ["Comeback", "Comeback", "Comeback", "Comeback"], category: 'full' },
     "Verts": { routes: ["Verts", "Verts", "Verts", "Verts"], category: 'full' },
+    "Hiker (4)": { routes: ["Hitch", "Hitch", "Hitch", "Hitch"], category: 'full' },
+    
     "China": { routes: ["Hitch", "Corner"], category: 'two' },
     "Drive": { routes: ["Drag", "Seam"], category: 'two' },
-    "Hiker": { routes: ["Hitch", "Hitch", "Hitch", "Hitch"], category: 'two' },
     "Pipes": { routes: ["Drag", "Post"], category: 'two' },
     "Twig": { routes: ["Fade", "Stick"], category: 'two' },
     "Dragon": { routes: ["Drag", "Dig"], category: 'two' },
@@ -53,6 +54,9 @@ export const DEFAULT_CONCEPT_LIBRARY: ConceptLibrary = {
     "Ringo Pump": { routes: ["Pump", "Bubble", "Block", "Bubble"], category: 'two' },
     "Linda": { routes: ["Bubble", "Block", "Bubble", "Block"], category: 'two' },
     "Linda Pump": { routes: ["Bubble", "Block", "Bubble", "Pump"], category: 'two' },
+    "Captain (2)": { routes: ["Comeback", "Comeback"], category: 'two' },
+    "Hiker (2)": { routes: ["Hitch", "Hitch"], category: 'two' },
+    
     "Dagger": { routes: ["Dig", "Fade", "Out"], category: 'three' },
     "Pinto": { routes: ["Post", "Dig", "Out"], category: 'three' },
     "Hit Em Up": { routes: ["Comebackgo", "Fade", "Dragsit"], category: 'three' },
@@ -63,7 +67,9 @@ export const DEFAULT_CONCEPT_LIBRARY: ConceptLibrary = {
     "Murrey": { routes: ["Block", "Step", "Block", "Block"], category: 'three' },
     "Murrey Pump": { routes: ["Block", "Block", "Fade", "Step"], category: 'three' },
     "Melody": { routes: ["Block", "Step", "Block", "Block"], category: 'three' },
-    "Melody Pump": { routes: ["Pump", "Step", "Block", "Block"], category: 'three' }
+    "Melody Pump": { routes: ["Pump", "Step", "Block", "Block"], category: 'three' },
+    "Captain (3)": { routes: ["Comeback", "Comeback", "Comeback"], category: 'three' },
+    "Hiker (3)": { routes: ["Hitch", "Hitch", "Hitch"], category: 'three' },
 };
 
 // Positions are % of width/height. Origin (0,0) is top-left.

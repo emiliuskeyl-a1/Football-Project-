@@ -1,6 +1,7 @@
-import React, { useState, useRef, MouseEvent } from 'react';
-import { ConceptLibrary, ConceptDefinition, MotionLibrary, RoutePath, Point, RouteLibrary } from '../types';
+import React, { useState, useRef, MouseEvent, useMemo } from 'react';
+import { ConceptLibrary, ConceptDefinition, MotionLibrary, RoutePath, Point, RouteLibrary, Play } from '../types';
 import { FORMATIONS } from '../constants';
+import { PlayDiagram } from './PlayDiagram';
 
 
 interface ConceptManagerProps {
@@ -19,6 +20,11 @@ interface ConceptManagerProps {
   onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+type ViewingItem = {
+  type: 'concept' | 'motion' | 'route';
+  name: string;
+}
+
 export const ConceptManager: React.FC<ConceptManagerProps> = ({
   isOpen,
   onClose,
@@ -35,6 +41,7 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
   onImport,
 }) => {
   const [activeTab, setActiveTab] = useState<'concepts' | 'motions' | 'routes'>('concepts');
+  const [viewingItem, setViewingItem] = useState<ViewingItem | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -80,6 +87,7 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
                 allRoutes={Object.keys(routes)}
                 onAddConcept={onAddConcept} 
                 onDeleteConcept={onDeleteConcept} 
+                onViewConcept={(name) => setViewingItem({ type: 'concept', name })}
             />
            )}
            {activeTab === 'motions' && (
@@ -87,6 +95,7 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
                 motions={motions}
                 onAddMotion={onAddMotion}
                 onDeleteMotion={onDeleteMotion}
+                onViewMotion={(name) => setViewingItem({ type: 'motion', name })}
              />
            )}
            {activeTab === 'routes' && (
@@ -94,16 +103,114 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
                     routes={routes}
                     onAddRoute={onAddRoute}
                     onDeleteRoute={onDeleteRoute}
+                    onViewRoute={(name) => setViewingItem({ type: 'route', name })}
                 />
            )}
         </div>
       </div>
+      {viewingItem && (
+        <ItemViewer
+            item={viewingItem}
+            onClose={() => setViewingItem(null)}
+            conceptLibrary={concepts}
+            motionLibrary={motions}
+            routeLibrary={routes}
+        />
+      )}
     </div>
   );
 };
 
+const getMirroredPath = (path: RoutePath): RoutePath => {
+    return path.map(point => ({ x: -point.x, y: point.y }));
+};
+
+// --- Item Viewer Modal ---
+const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibrary: ConceptLibrary, motionLibrary: MotionLibrary, routeLibrary: RouteLibrary}> = 
+({ item, onClose, conceptLibrary, motionLibrary, routeLibrary }) => {
+    
+    const studyPlay: Play | null = useMemo(() => {
+        if (!item.name) return null;
+
+        switch (item.type) {
+            case 'route': {
+                const path = routeLibrary[item.name];
+                if (!path) return null;
+                return {
+                    playcall: `Route: ${item.name}`,
+                    formationName: 'Spread',
+                    routes: { 'Z': { routeName: item.name, path: path } },
+                    motions: [],
+                };
+            }
+            case 'concept': {
+                const concept = conceptLibrary[item.name];
+                if (!concept) return null;
+                const receivers = ['Z', 'H', 'S', 'W'];
+                const assignments: Play['routes'] = {};
+                const numRoutes = concept.routes.length;
+
+                for (let i = 0; i < numRoutes; i++) {
+                    const receiver = receivers[i];
+                    const routeName = concept.routes[i];
+                    if (receiver && routeName && routeLibrary[routeName]) {
+                        let path = routeLibrary[routeName];
+                        // Mirror for left-side receivers (S and W are indices 2 and 3)
+                        if (i >= 2) {
+                            path = getMirroredPath(path);
+                        }
+                        assignments[receiver] = { routeName, path };
+                    }
+                }
+                return {
+                    playcall: `Concept: ${item.name}`,
+                    formationName: 'Spread',
+                    routes: assignments,
+                    motions: [],
+                };
+            }
+            case 'motion': {
+                const motion = motionLibrary[item.name];
+                if (!motion) return null;
+                return {
+                    playcall: `Motion: ${item.name}`,
+                    formationName: 'Spread',
+                    routes: {},
+                    motions: [{ receiver: motion.receiver, motionName: item.name, path: motion.path }]
+                };
+            }
+            default:
+                return null;
+        }
+    }, [item, routeLibrary, conceptLibrary, motionLibrary]);
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[60] p-4" onClick={onClose}>
+            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl flex flex-col p-4 border border-blue-500" onClick={(e) => e.stopPropagation()}>
+                 <header className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-yellow-300 capitalize">
+                        Preview: {item.type} - {item.name}
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl leading-none px-2">&times;</button>
+                </header>
+                <div className="w-full aspect-[16/10] bg-gray-900 rounded-md">
+                    {studyPlay ? <PlayDiagram play={studyPlay} /> : <div className="flex items-center justify-center h-full">Could not display item.</div>}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
 // --- Concept Editor Component ---
-const ConceptEditor: React.FC<{concepts: ConceptLibrary, allRoutes: string[], onAddConcept: ConceptManagerProps['onAddConcept'], onDeleteConcept: ConceptManagerProps['onDeleteConcept']}> = ({ concepts, allRoutes, onAddConcept, onDeleteConcept }) => {
+interface ConceptEditorProps {
+    concepts: ConceptLibrary;
+    allRoutes: string[];
+    onAddConcept: ConceptManagerProps['onAddConcept'];
+    onDeleteConcept: ConceptManagerProps['onDeleteConcept'];
+    onViewConcept: (name: string) => void;
+}
+const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAddConcept, onDeleteConcept, onViewConcept }) => {
     const [newConceptName, setNewConceptName] = useState('');
     const [zRoute, setZRoute] = useState(allRoutes[0] || '');
     const [hRoute, setHRoute] = useState(allRoutes[0] || '');
@@ -148,7 +255,12 @@ const ConceptEditor: React.FC<{concepts: ConceptLibrary, allRoutes: string[], on
                         <p className="font-bold text-blue-400">{name}</p>
                         <p className="text-xs text-gray-400 capitalize">{concept.category} - {concept.routes.join(', ')}</p>
                     </div>
-                    <button onClick={() => onDeleteConcept(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                    <div className="flex items-center space-x-2">
+                        <IconButton onClick={() => onViewConcept(name)} title="View Concept">
+                            <EyeIcon />
+                        </IconButton>
+                        <button onClick={() => onDeleteConcept(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                    </div>
                     </li>
                 ))}
                 </ul>
@@ -158,7 +270,10 @@ const ConceptEditor: React.FC<{concepts: ConceptLibrary, allRoutes: string[], on
 };
 
 // --- Motion Editor Component ---
-const MotionEditor: React.FC<Pick<ConceptManagerProps, 'motions' | 'onAddMotion' | 'onDeleteMotion'>> = ({ motions, onAddMotion, onDeleteMotion }) => {
+interface MotionEditorProps extends Pick<ConceptManagerProps, 'motions' | 'onAddMotion' | 'onDeleteMotion'> {
+    onViewMotion: (name: string) => void;
+}
+const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDeleteMotion, onViewMotion }) => {
     const [newMotionName, setNewMotionName] = useState('');
     const [selectedReceiver, setSelectedReceiver] = useState<string | null>(null);
     const [currentPath, setCurrentPath] = useState<RoutePath>([]);
@@ -239,7 +354,12 @@ const MotionEditor: React.FC<Pick<ConceptManagerProps, 'motions' | 'onAddMotion'
                     <p className="font-bold text-blue-400">{name}</p>
                     <p className="text-xs text-gray-400">For Receiver: <span className="font-semibold text-yellow-300">{motionData.receiver}</span></p>
                 </div>
-                <button onClick={() => onDeleteMotion(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                 <div className="flex items-center space-x-2">
+                    <IconButton onClick={() => onViewMotion(name)} title="View Motion">
+                        <EyeIcon />
+                    </IconButton>
+                    <button onClick={() => onDeleteMotion(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                </div>
               </li>
             ))}
           </ul>
@@ -250,7 +370,10 @@ const MotionEditor: React.FC<Pick<ConceptManagerProps, 'motions' | 'onAddMotion'
 
 
 // --- Route Editor Component ---
-const RouteEditor: React.FC<Pick<ConceptManagerProps, 'routes' | 'onAddRoute' | 'onDeleteRoute'>> = ({ routes, onAddRoute, onDeleteRoute }) => {
+interface RouteEditorProps extends Pick<ConceptManagerProps, 'routes' | 'onAddRoute' | 'onDeleteRoute'> {
+    onViewRoute: (name: string) => void;
+}
+const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteRoute, onViewRoute }) => {
     const [newRouteName, setNewRouteName] = useState('');
     const [currentPath, setCurrentPath] = useState<Point[]>([]);
     const svgRef = useRef<SVGSVGElement>(null);
@@ -266,7 +389,7 @@ const RouteEditor: React.FC<Pick<ConceptManagerProps, 'routes' | 'onAddRoute' | 
 
         const transformedPoint = svgPoint.matrixTransform(svgRef.current.getScreenCTM()?.inverse());
         const relativeX = transformedPoint.x;
-        const relativeY = transformedPoint.y;
+        const relativeY = -transformedPoint.y; // Invert Y-axis for drawing
         setCurrentPath(prev => [...prev, { x: relativeX, y: relativeY }]);
     };
     
@@ -288,15 +411,15 @@ const RouteEditor: React.FC<Pick<ConceptManagerProps, 'routes' | 'onAddRoute' | 
                 <FormInput id="route-name" label="Route Name" value={newRouteName} onChange={setNewRouteName} placeholder="e.g., Deep Corner" required />
                 <p className="block text-sm font-medium text-gray-300">Click on the field to draw the path (starts from line of scrimmage).</p>
                 <div className="w-full aspect-square bg-blue-900/50 border-2 border-dashed border-gray-600 rounded-lg cursor-crosshair">
-                    <svg ref={svgRef} className="w-full h-full" viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`} onClick={handleFieldClick}>
+                    <svg ref={svgRef} className="w-full h-full" viewBox={`${VIEWBOX.x} ${-VIEWBOX.height + VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`} onClick={handleFieldClick}>
                         {/* Field Markings */}
-                        <line x1="0" y1={VIEWBOX.y} x2="0" y2={VIEWBOX.height} stroke="#4b5563" strokeWidth="0.5" />
+                        <line x1="0" y1={-VIEWBOX.height} x2="0" y2={VIEWBOX.y} stroke="#4b5563" strokeWidth="0.5" />
                         {Array.from({ length: 9 }).map((_, i) => (
-                            <line key={i} x1={VIEWBOX.x} y1={i * 5} x2={VIEWBOX.width} y2={i * 5} stroke="#4b5563" strokeWidth="0.5" strokeDasharray="1 2" />
+                            <line key={i} x1={VIEWBOX.x} y1={-i * 5} x2={VIEWBOX.x + VIEWBOX.width} y2={-i * 5} stroke="#4b5563" strokeWidth="0.5" strokeDasharray="1 2" />
                         ))}
                         <circle cx="0" cy="0" r="1.5" className="fill-yellow-300" />
                         {currentPath.length > 0 && (
-                            <polyline points={`0,0 ${currentPath.map(p => `${p.x},${p.y}`).join(' ')}`} className="fill-none stroke-yellow-300" strokeWidth="1" />
+                            <polyline points={`0,0 ${currentPath.map(p => `${p.x},${-p.y}`).join(' ')}`} className="fill-none stroke-yellow-300" strokeWidth="1" />
                         )}
                     </svg>
                 </div>
@@ -311,7 +434,12 @@ const RouteEditor: React.FC<Pick<ConceptManagerProps, 'routes' | 'onAddRoute' | 
                     {sortedRoutes.map(([name, _]) => (
                         <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
                             <p className="font-bold text-blue-400">{name}</p>
-                            <button onClick={() => onDeleteRoute(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                            <div className="flex items-center space-x-2">
+                                <IconButton onClick={() => onViewRoute(name)} title="View Route">
+                                    <EyeIcon />
+                                </IconButton>
+                                <button onClick={() => onDeleteRoute(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                            </div>
                         </li>
                     ))}
                 </ul>
@@ -350,4 +478,17 @@ const RouteSelect: React.FC<{label: string, value: string, onChange: (val: strin
     <FormSelect id={`route-${label}`} label={label} value={value} onChange={onChange}>
         {allRoutes.map(route => <option key={route} value={route}>{route}</option>)}
     </FormSelect>
+);
+
+const IconButton: React.FC<{onClick: () => void, title: string, children: React.ReactNode}> = ({ onClick, title, children }) => (
+    <button onClick={onClick} title={title} className="p-1.5 rounded-md text-gray-400 bg-gray-700 hover:bg-gray-600 hover:text-white transition-colors">
+        {children}
+    </button>
+);
+
+const EyeIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
 );
