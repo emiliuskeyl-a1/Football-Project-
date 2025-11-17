@@ -139,7 +139,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col items-center">
        <header className="w-full max-w-5xl text-center mb-4 md:mb-6">
         <div className="flex justify-between items-center">
            <div className="w-1/3 flex justify-start">
