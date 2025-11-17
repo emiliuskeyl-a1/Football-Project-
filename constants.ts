@@ -1,7 +1,7 @@
-import { RouteLibrary, ConceptLibrary, FormationLibrary } from './types';
+import { RouteLibrary, ConceptLibrary, FormationLibrary, MotionLibrary } from './types';
 
 // Coordinates are relative (in yards). X is horizontal, Y is vertical downfield.
-export const ROUTE_LIBRARY: RouteLibrary = {
+export const DEFAULT_ROUTE_LIBRARY: RouteLibrary = {
     "Slant": [{x: 0, y: 0}, {x: 0, y: 3}, {x: -7, y: 7}],
     "Corner": [{x: 0, y: 0}, {x: 0, y: 8}, {x: 7, y: 15}],
     "Flat": [{x: 0, y: 0}, {x: 0, y: 2}, {x: 8, y: 2}],
@@ -31,7 +31,7 @@ export const ROUTE_LIBRARY: RouteLibrary = {
     "LOut": [{x: 0, y: 0}, {x: 0, y: 5}, {x: -10, y: 5}],
 };
 
-export const CONCEPT_ROUTES: ConceptLibrary = {
+export const DEFAULT_CONCEPT_LIBRARY: ConceptLibrary = {
     "Mesh": { routes: ["Out", "Drag", "LDrag", "LOut"], category: 'full' },
     "Captain": { routes: ["Comeback", "Comeback", "Comeback", "Comeback"], category: 'full' },
     "Verts": { routes: ["Verts", "Verts", "Verts", "Verts"], category: 'full' },
@@ -113,3 +113,16 @@ export const PLAYS_ONE_REC = [
     "Post", "Verts", "Corner", "Out", "Dig", "Hook", "Hitch", 
     "Quick Out", "Flat", "Slant", "Drag", "Bubble", "Seam", "Fade"
 ];
+
+export const DEFAULT_MOTION_LIBRARY: MotionLibrary = {
+    "Zap": { path: [{x: 0, y: 0}, {x: -20, y: 0}], receiver: 'Z' },
+    "Zip": { path: [{x: 0, y: 0}, {x: -30, y: 0}], receiver: 'Z' },
+    "Zulu": { path: [{x: 0, y: 0}, {x: -40, y: 0}], receiver: 'Z' },
+    "Hoop": { path: [{x: 0, y: 0}, {x: 20, y: 0}], receiver: 'H' },
+    "Hobbit": { path: [{x: 0, y: 0}, {x: -20, y: 0}], receiver: 'H' },
+    "Hammer": { path: [{x: 0, y: 0}, {x: -5, y: -2}, {x: -5, y: 2}], receiver: 'H' },
+    "Wax": { path: [{x: 0, y: 0}, {x: 20, y: 0}], receiver: 'W' },
+    "Wap": { path: [{x: 0, y: 0}, {x: -20, y: 0}], receiver: 'W' },
+    "Sail": { path: [{x: 0, y: 0}, {x: 20, y: 0}], receiver: 'S' },
+    "Sax": { path: [{x: 0, y: 0}, {x: -20, y: 0}], receiver: 'S' },
+};

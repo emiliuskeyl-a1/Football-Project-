@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { ConceptManager } from './components/ConceptManager';
 import { MainMenu } from './components/MainMenu';
 import { GeneratorView } from './components/GeneratorView';
 import { StudyView } from './components/StudyView';
-import { Play, ConceptLibrary, ConceptDefinition, AppMode } from './types';
+import { Play, ConceptLibrary, ConceptDefinition, AppMode, MotionLibrary, RoutePath, RouteLibrary } from './types';
 import { generatePlay } from './services/playbookService';
-import { CONCEPT_ROUTES, ROUTE_LIBRARY } from './constants';
+import { DEFAULT_CONCEPT_LIBRARY, DEFAULT_ROUTE_LIBRARY, DEFAULT_MOTION_LIBRARY } from './constants';
 
 const App: React.FC = () => {
   const [appMode, setAppMode] = useState<AppMode>('mainMenu');
@@ -16,13 +17,34 @@ const App: React.FC = () => {
 
   const [conceptLibrary, setConceptLibrary] = useState<ConceptLibrary>(() => {
     try {
-      const savedConcepts = localStorage.getItem('footballConcepts');
-      return savedConcepts ? JSON.parse(savedConcepts) : CONCEPT_ROUTES;
+      const saved = localStorage.getItem('footballConcepts');
+      return saved ? JSON.parse(saved) : DEFAULT_CONCEPT_LIBRARY;
     } catch (error) {
       console.error("Failed to load concepts from localStorage", error);
-      return CONCEPT_ROUTES;
+      return DEFAULT_CONCEPT_LIBRARY;
     }
   });
+
+  const [motionLibrary, setMotionLibrary] = useState<MotionLibrary>(() => {
+    try {
+      const saved = localStorage.getItem('footballMotions');
+      return saved ? JSON.parse(saved) : DEFAULT_MOTION_LIBRARY;
+    } catch (error) {
+      console.error("Failed to load motions from localStorage", error);
+      return DEFAULT_MOTION_LIBRARY;
+    }
+  });
+
+  const [routeLibrary, setRouteLibrary] = useState<RouteLibrary>(() => {
+    try {
+      const saved = localStorage.getItem('footballRoutes');
+      return saved ? JSON.parse(saved) : DEFAULT_ROUTE_LIBRARY;
+    } catch (error) {
+      console.error("Failed to load routes from localStorage", error);
+      return DEFAULT_ROUTE_LIBRARY;
+    }
+  });
+
 
   useEffect(() => {
     try {
@@ -32,9 +54,25 @@ const App: React.FC = () => {
     }
   }, [conceptLibrary]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('footballMotions', JSON.stringify(motionLibrary));
+    } catch (error) {
+      console.error("Failed to save motions to localStorage", error);
+    }
+  }, [motionLibrary]);
+
+   useEffect(() => {
+    try {
+      localStorage.setItem('footballRoutes', JSON.stringify(routeLibrary));
+    } catch (error) {
+      console.error("Failed to save routes to localStorage", error);
+    }
+  }, [routeLibrary]);
+
   const handleOpenManagerClick = () => {
-    setPasswordInput(''); // Reset input on open
-    setPasswordError('');   // Reset error on open
+    setPasswordInput('');
+    setPasswordError('');
     setIsPasswordPromptOpen(true);
   };
 
@@ -58,29 +96,119 @@ const App: React.FC = () => {
         alert(`Concept name "${name}" already exists!`);
         return;
     }
-    const newLibrary = { ...conceptLibrary, [name]: concept };
-    setConceptLibrary(newLibrary);
+    setConceptLibrary(prev => ({ ...prev, [name]: concept }));
     alert(`Concept "${name}" added successfully!`);
   };
 
   const handleDeleteConcept = (name: string) => {
-      if (window.confirm(`Are you sure you want to delete the concept "${name}"? This cannot be undone.`)) {
-          const newLibrary = { ...conceptLibrary };
-          delete newLibrary[name];
-          setConceptLibrary(newLibrary);
-      }
+      setConceptLibrary(currentLibrary => {
+        const { [name]: _, ...newLibrary } = currentLibrary;
+        return newLibrary;
+      });
   };
+
+  const handleAddMotion = (name: string, path: RoutePath, receiver: string) => {
+     if (!name.trim()) {
+        alert('Motion name cannot be empty.');
+        return;
+    }
+    if (motionLibrary[name]) {
+        alert(`Motion name "${name}" already exists!`);
+        return;
+    }
+    setMotionLibrary(prev => ({ ...prev, [name]: { path, receiver } }));
+    alert(`Motion "${name}" added successfully!`);
+  }
+
+  const handleDeleteMotion = (name: string) => {
+    setMotionLibrary(currentLibrary => {
+        const { [name]: _, ...newLibrary } = currentLibrary;
+        return newLibrary;
+    });
+  }
+
+  const handleAddRoute = (name: string, path: RoutePath) => {
+    if (!name.trim()) {
+        alert('Route name cannot be empty.');
+        return;
+    }
+    if (routeLibrary[name]) {
+        alert(`Route name "${name}" already exists!`);
+        return;
+    }
+    setRouteLibrary(prev => ({ ...prev, [name]: path }));
+    alert(`Route "${name}" added successfully!`);
+  }
+
+  const handleDeleteRoute = (name: string) => {
+    setRouteLibrary(currentLibrary => {
+        const { [name]: _, ...newLibrary } = currentLibrary;
+        return newLibrary;
+    });
+  }
+
+
+  const handleExportConfig = () => {
+    try {
+      const config = {
+        concepts: conceptLibrary,
+        motions: motionLibrary,
+        routes: routeLibrary,
+      };
+      const jsonString = JSON.stringify(config, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'playbook-config.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export config", error);
+      alert("An error occurred while exporting the configuration.");
+    }
+  };
+
+  const handleImportConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const config = JSON.parse(text);
+        
+        if (config && typeof config.concepts === 'object' && typeof config.motions === 'object' && typeof config.routes === 'object') {
+            setConceptLibrary(config.concepts);
+            setMotionLibrary(config.motions);
+            setRouteLibrary(config.routes);
+            alert("Configuration imported successfully!");
+        } else {
+          throw new Error("Invalid configuration file format.");
+        }
+      } catch (error) {
+        console.error("Failed to import config", error);
+        alert("Failed to import configuration. Please make sure it's a valid playbook file.");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
 
   const renderContent = () => {
     switch (appMode) {
       case 'generator':
-        return <GeneratorView conceptLibrary={conceptLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="both" />;
+        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="both" />;
       case 'quizDiagram':
-        return <GeneratorView conceptLibrary={conceptLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="playcallOnly" />;
+        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="playcallOnly" />;
        case 'quizPlaycall':
-        return <GeneratorView conceptLibrary={conceptLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="diagramOnly" />;
+        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="diagramOnly" />;
       case 'study':
-        return <StudyView conceptLibrary={conceptLibrary} routeLibrary={ROUTE_LIBRARY} onBackToMenu={() => setAppMode('mainMenu')} />;
+        return <StudyView conceptLibrary={conceptLibrary} routeLibrary={routeLibrary} motionLibrary={motionLibrary} onBackToMenu={() => setAppMode('mainMenu')} />;
       case 'mainMenu':
       default:
         return <MainMenu onModeSelect={setAppMode} />;
@@ -95,7 +223,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
           <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h2 className="text-xl font-bold text-yellow-300 mb-4">Enter Password</h2>
-            <p className="text-gray-400 mb-4">Please enter the password to access the Concept Manager.</p>
+            <p className="text-gray-400 mb-4">Please enter the password to access the Playbook Manager.</p>
             <form onSubmit={handlePasswordSubmit}>
               <input
                 type="password"
@@ -122,9 +250,16 @@ const App: React.FC = () => {
         isOpen={isManagerOpen}
         onClose={() => setIsManagerOpen(false)}
         concepts={conceptLibrary}
-        allRoutes={Object.keys(ROUTE_LIBRARY)}
+        motions={motionLibrary}
+        routes={routeLibrary}
         onAddConcept={handleAddConcept}
         onDeleteConcept={handleDeleteConcept}
+        onAddMotion={handleAddMotion}
+        onDeleteMotion={handleDeleteMotion}
+        onAddRoute={handleAddRoute}
+        onDeleteRoute={handleDeleteRoute}
+        onExport={handleExportConfig}
+        onImport={handleImportConfig}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Point } from '../types';
+import { Play, Point, RoutePath } from '../types';
 
 interface PlayDiagramProps {
   play: Play;
@@ -20,7 +20,7 @@ const Player: React.FC<{ position: Point; label: string }> = ({ position, label 
   );
 };
 
-const RoutePath: React.FC<{ startPos: Point; path: Point[]; color: string; routeName: string }> = ({ startPos, path, color, routeName }) => {
+const PathLine: React.FC<{ startPos: Point; path: RoutePath; color: string; isMotion?: boolean; hasArrow?: boolean }> = ({ startPos, path, color, isMotion = false, hasArrow = true }) => {
   if (!path || path.length === 0) return null;
 
   const pathData = path
@@ -31,23 +31,22 @@ const RoutePath: React.FC<{ startPos: Point; path: Point[]; color: string; route
     })
     .join(' ');
   
-  const hasArrow = routeName !== 'Block';
-
   return (
     <path
       d={pathData}
       stroke={color}
-      strokeWidth="4"
+      strokeWidth={isMotion ? "3" : "4"}
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
+      strokeDasharray={isMotion ? "8 8" : "none"}
       markerEnd={hasArrow ? "url(#arrowhead)" : "none"}
     />
   );
 };
 
 export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
-  const { formationName, routes } = play;
+  const { formationName, routes, motions } = play;
   const formation = FORMATIONS[formationName];
 
   const colors = ["#6ee7b7", "#f87171", "#60a5fa", "#facc15", "#c084fc"];
@@ -109,20 +108,34 @@ export const PlayDiagram: React.FC<PlayDiagramProps> = ({ play }) => {
         <Player position={{x: FIELD_WIDTH / 2, y: (FIELD_HEIGHT * 80) / 100}} label="C" />
         <Player position={{x: FIELD_WIDTH / 2, y: (FIELD_HEIGHT * 84) / 100}} label="QB" />
 
-        {/* Receivers and Routes */}
-        {Object.keys(routes).map((receiver, index) => {
+        {/* Motions, Routes, and Players */}
+        {Object.keys(formation).map((receiver, index) => {
           const routeInfo = routes[receiver];
-          if (!formation[receiver] || !routeInfo) return null;
+          const motionInfo = motions.find(m => m.receiver === receiver);
+          
+          if (!formation[receiver]) return null;
           
           const startPos = {
             x: (FIELD_WIDTH * formation[receiver].x) / 100,
             y: (FIELD_HEIGHT * formation[receiver].y) / 100,
           };
+          
+          // Determine final position after motion
+          let finalPos = { ...startPos };
+          if (motionInfo) {
+              const endPoint = motionInfo.path[motionInfo.path.length - 1];
+              const YARDS_TO_PERCENT_X = 100 / 53.3; 
+              finalPos.x = startPos.x + (endPoint.x * (FIELD_WIDTH / (53.3 * 2))); // Rough conversion
+              finalPos.y = startPos.y - (endPoint.y * YARD_SCALE);
+          }
+
 
           return (
             <g key={receiver}>
-              <RoutePath startPos={startPos} path={routeInfo.path} color={colors[index % colors.length]} routeName={routeInfo.routeName} />
+              {motionInfo && <PathLine startPos={startPos} path={motionInfo.path} color={"#9ca3af"} isMotion={true} hasArrow={false} />}
+              {routeInfo && <PathLine startPos={finalPos} path={routeInfo.path} color={colors[index % colors.length]} hasArrow={routeInfo.routeName !== 'Block'} />}
               <Player position={startPos} label={receiver} />
+               {motionInfo && <Player position={finalPos} label={receiver} />}
             </g>
           );
         })}

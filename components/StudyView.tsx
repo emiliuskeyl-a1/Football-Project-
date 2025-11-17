@@ -1,31 +1,35 @@
 import React, { useState, useMemo } from 'react';
 import { PlayDiagram } from './PlayDiagram';
-import { Play, ConceptLibrary, RouteLibrary, RoutePath } from '../types';
+import { Play, ConceptLibrary, RouteLibrary, RoutePath, MotionLibrary } from '../types';
 import { FORMATIONS } from '../constants';
 
 interface StudyViewProps {
   conceptLibrary: ConceptLibrary;
   routeLibrary: RouteLibrary;
+  motionLibrary: MotionLibrary;
   onBackToMenu: () => void;
 }
 
-type StudyMode = 'routes' | 'concepts';
+type StudyMode = 'routes' | 'concepts' | 'motions';
 
-export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibrary, onBackToMenu }) => {
+export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibrary, motionLibrary, onBackToMenu }) => {
   const [studyMode, setStudyMode] = useState<StudyMode>('routes');
   const [selectedItem, setSelectedItem] = useState<string>('');
 
   const sortedRoutes = useMemo(() => Object.keys(routeLibrary).sort(), [routeLibrary]);
   const sortedConcepts = useMemo(() => Object.keys(conceptLibrary).sort(), [conceptLibrary]);
+  const sortedMotions = useMemo(() => Object.keys(motionLibrary).sort(), [motionLibrary]);
 
   // Set default selection when mode changes
   React.useEffect(() => {
     if (studyMode === 'routes') {
       setSelectedItem(sortedRoutes[0] || '');
-    } else {
+    } else if (studyMode === 'concepts') {
       setSelectedItem(sortedConcepts[0] || '');
+    } else {
+      setSelectedItem(sortedMotions[0] || '');
     }
-  }, [studyMode, sortedRoutes, sortedConcepts]);
+  }, [studyMode, sortedRoutes, sortedConcepts, sortedMotions]);
 
   const studyPlay: Play | null = useMemo(() => {
     if (!selectedItem) return null;
@@ -38,7 +42,8 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
         formationName: 'Spread', // Use a default formation for display
         routes: {
           'Z': { routeName: selectedItem, path: path }
-        }
+        },
+        motions: [],
       };
     }
 
@@ -46,14 +51,14 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       const concept = conceptLibrary[selectedItem];
       if (!concept) return null;
       
-      const formation = FORMATIONS['Spread'];
-      const rightReceivers = ['Z', 'H']; // Display on 2 right-side receivers in Spread
+      const receivers = ['Z', 'H', 'S', 'W'];
       const assignments: Play['routes'] = {};
+      const numRoutes = concept.routes.length;
       
-      for (let i = 0; i < rightReceivers.length; i++) {
-        const receiver = rightReceivers[i];
+      for (let i = 0; i < numRoutes; i++) {
+        const receiver = receivers[i];
         const routeName = concept.routes[i];
-        if (routeName && routeLibrary[routeName]) {
+        if (receiver && routeName && routeLibrary[routeName]) {
           assignments[receiver] = { routeName, path: routeLibrary[routeName] };
         }
       }
@@ -61,18 +66,35 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       return {
         playcall: `Concept: ${selectedItem}`,
         formationName: 'Spread',
-        routes: assignments
+        routes: assignments,
+        motions: [],
       };
     }
 
+    if (studyMode === 'motions') {
+        const motion = motionLibrary[selectedItem];
+        if (!motion) return null;
+
+        return {
+            playcall: `Motion: ${selectedItem}`,
+            formationName: 'Spread',
+            routes: {},
+            motions: [{
+                receiver: motion.receiver,
+                motionName: selectedItem,
+                path: motion.path
+            }]
+        }
+    }
+
     return null;
-  }, [selectedItem, studyMode, routeLibrary, conceptLibrary]);
+  }, [selectedItem, studyMode, routeLibrary, conceptLibrary, motionLibrary]);
 
   const handleSelectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedItem(e.target.value);
   };
   
-  const options = studyMode === 'routes' ? sortedRoutes : sortedConcepts;
+  const options = studyMode === 'routes' ? sortedRoutes : studyMode === 'concepts' ? sortedConcepts : sortedMotions;
 
   return (
     <div className="w-full h-full flex flex-col items-center">
@@ -101,6 +123,9 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
                 </button>
                 <button onClick={() => setStudyMode('concepts')} className={`w-full py-2 rounded-md text-sm font-bold transition-colors ${studyMode === 'concepts' ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-600'}`}>
                     Concepts
+                </button>
+                 <button onClick={() => setStudyMode('motions')} className={`w-full py-2 rounded-md text-sm font-bold transition-colors ${studyMode === 'motions' ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-600'}`}>
+                    Motions
                 </button>
              </div>
           </div>

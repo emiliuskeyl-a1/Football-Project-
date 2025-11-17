@@ -1,29 +1,17 @@
-import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition } from '../types';
+import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition, MotionLibrary, PlayerPosition, RouteLibrary } from '../types';
 import { 
-    ROUTE_LIBRARY, 
     FORMATIONS,
     PLAYS_ONE_REC,
 } from '../constants';
 
 const FORMATION_NAMES = Object.keys(FORMATIONS);
-
-// --- Dictionaries from Python script ---
 const DIRECTIONS = { 1: "31", 2: "35", 3: "49", 4: "61", 5: "51", 6: "32", 7: "36", 8: "48", 9: "62" };
-const H_MOTIONS = { 1: "Hoop", 2: "Hobbit", 3: "Hammer", 4: "" };
-const H_WEIGHTS = [1, 1, 1, 10];
-const W_MOTIONS = { 1: "Wax", 2: "Wap", 3: "" };
-const W_WEIGHTS = [1, 1, 10];
-const S_MOTIONS = { 1: "Sail", 2: "Sax", 3: "" };
-const S_WEIGHTS = [1, 1, 10];
-const Z_MOTIONS = { 1: "Zap", 2: "Zip", 3: "Zulu", 4: "" };
-const Z_WEIGHTS = [1, 1, 1, 10];
 const PLAY_MOTIONS = { 1: "Sugar", 2: "S Jet", 3: "W Jet", 4: "Wunder", 5: "Hexit", 6: "" };
 const PLAY_MOTION_WEIGHTS = [1, 1, 1, 1, 1, 10];
 
 
 // --- Helper Functions ---
-
-function getRandomElement<T,>(arr: T[]): T {
+function getRandomElement<T,>(arr: T[]): T | null {
     if (arr.length === 0) return null;
     return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -51,16 +39,48 @@ function getMirroredPath(path: RoutePath): RoutePath {
     return path.map(point => ({ x: -point.x, y: point.y }));
 }
 
+function applyMotions(
+    baseFormation: Formation,
+    calledMotions: { receiver: string, motionName: string }[],
+    motionLibrary: MotionLibrary
+): { finalFormation: Formation, appliedMotions: Play['motions']} {
+    const finalFormation = JSON.parse(JSON.stringify(baseFormation)); // Deep copy
+    const appliedMotions: Play['motions'] = [];
+
+    // NOTE: This assumes motion paths are relative to the player's starting position.
+    // X is in yards, Y is in yards. The position is in %.
+    // We need a scale factor. Field width is ~53.3 yards.
+    const YARDS_TO_PERCENT_X = 100 / 53.3; 
+
+    for (const { receiver, motionName } of calledMotions) {
+        const motionData = motionLibrary[motionName];
+        if (motionData && finalFormation[receiver]) {
+            const motionPath = motionData.path;
+            const startPos = baseFormation[receiver];
+            const endPoint = motionPath[motionPath.length - 1];
+            
+            // Adjust final position based on the motion
+            finalFormation[receiver].x = startPos.x + (endPoint.x * YARDS_TO_PERCENT_X);
+            finalFormation[receiver].y = startPos.y - endPoint.y; // Y is inverted in diagram logic
+
+            appliedMotions.push({ receiver, motionName, path: motionPath });
+        }
+    }
+    return { finalFormation, appliedMotions };
+}
+
+
 function assignRoutesToReceivers(
     conceptName: string, 
     receivers: string[],
     isRightSide: boolean,
-    conceptLibrary: ConceptLibrary
+    conceptLibrary: ConceptLibrary,
+    routeLibrary: RouteLibrary
 ): { [receiver: string]: { routeName: string; path: RoutePath } } {
     let conceptDef = conceptLibrary[conceptName];
     
     // Handle single-route concepts passed by name (e.g., "Hook", "Fade")
-    if (!conceptDef && ROUTE_LIBRARY[conceptName]) {
+    if (!conceptDef && routeLibrary[conceptName]) {
         conceptDef = { routes: [conceptName], category: 'one' };
     }
     
@@ -82,15 +102,20 @@ function assignRoutesToReceivers(
         const receiver = receivers[i];
         const routeName = conceptRoutes[i % conceptRoutes.length];
         
-        if (routeName && ROUTE_LIBRARY[routeName]) {
-            let path = ROUTE_LIBRARY[routeName];
+        if (routeName && routeLibrary[routeName]) {
+            let path = routeLibrary[routeName];
             if (!isRightSide) {
                 path = getMirroredPath(path);
             }
             assignments[receiver] = { routeName, path };
         } else {
              // Fallback to Verts if route not found
-            let path = ROUTE_LIBRARY["Verts"];
+            let path = routeLibrary["Verts"];
+            if (!path) {
+                // Absolute fallback if even Verts is deleted.
+                assignments[receiver] = { routeName: "N/A", path: [{x:0, y:0}] };
+                continue;
+            }
             if (!isRightSide) {
                 path = getMirroredPath(path);
             }
@@ -100,17 +125,46 @@ function assignRoutesToReceivers(
     return assignments;
 }
 
-export const generatePlay = (conceptLibrary: ConceptLibrary): Play => {
-    // 1. FORMATION
+export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: MotionLibrary, routeLibrary: RouteLibrary): Play => {
+    // 1. BASE FORMATION
     const formationName = getRandomElement(FORMATION_NAMES);
-    const formation: Formation = FORMATIONS[formationName];
+    const baseFormation: Formation = FORMATIONS[formationName];
+    const baseReceivers = Object.keys(baseFormation);
 
-    const receivers = Object.keys(formation);
-    // Sort receivers from outside-in for each side
-    const rightReceivers = receivers.filter(r => formation[r].x >= 50).sort((a,b) => formation[b].x - formation[a].x);
-    const leftReceivers = receivers.filter(r => formation[r].x < 50).sort((a,b) => formation[a].x - formation[b].x);
+    // 2. MOTIONS
+    const receiverMotions: { [receiver: string]: string[] } = {};
+    for (const motionName in motionLibrary) {
+        const motionData = motionLibrary[motionName];
+        if (!receiverMotions[motionData.receiver]) {
+            receiverMotions[motionData.receiver] = [];
+        }
+        receiverMotions[motionData.receiver].push(motionName);
+    }
 
-    // 2. CONCEPTS & DIRECTION
+    const calledMotions: { receiver: string, motionName: string }[] = [];
+    const motionCalls: string[] = [];
+
+    // Decide which receivers will motion (low probability)
+    for(const receiver of baseReceivers) {
+        if (receiverMotions[receiver] && Math.random() < 0.25) {
+            const motionName = getRandomElement(receiverMotions[receiver]);
+            if (motionName) {
+                calledMotions.push({ receiver, motionName });
+                motionCalls.push(motionName);
+            }
+        }
+    }
+    const playMotion = getRandomWeightedElement(Object.values(PLAY_MOTIONS), PLAY_MOTION_WEIGHTS);
+
+    // 3. APPLY MOTIONS TO GET FINAL FORMATION
+    const { finalFormation, appliedMotions } = applyMotions(baseFormation, calledMotions, motionLibrary);
+
+    // 4. RE-CALCULATE RECEIVER SIDES BASED ON FINAL POSITIONS
+    const finalReceivers = Object.keys(finalFormation);
+    const rightReceivers = finalReceivers.filter(r => finalFormation[r].x >= 50).sort((a,b) => finalFormation[b].x - finalFormation[a].x);
+    const leftReceivers = finalReceivers.filter(r => finalFormation[r].x < 50).sort((a,b) => finalFormation[a].x - finalFormation[b].x);
+
+    // 5. CONCEPTS & DIRECTION
     const direction = DIRECTIONS[getRandomKey(DIRECTIONS)];
     const formationHasRightStrongSide = ['Tri', 'Brunch', 'Spread'].includes(formationName);
     const formationHasLeftStrongSide = ['Angle', 'Lunch', 'Split'].includes(formationName);
@@ -124,17 +178,17 @@ export const generatePlay = (conceptLibrary: ConceptLibrary): Play => {
 
     const getAvailableConcepts = (count: number, side: 'right' | 'left', allConcepts: ConceptLibrary) => {
         let category: ConceptDefinition['category'];
-        if (count === 1) return PLAYS_ONE_REC; // Iso routes are a specific list
+        if (count === 1) return PLAYS_ONE_REC; 
 
         switch (count) {
             case 2: category = 'two'; break;
             case 3: category = 'three'; break;
+            case 4: category = 'full'; break;
             default: return [];
         }
 
         let baseList = Object.keys(allConcepts).filter(c => allConcepts[c].category === category);
         
-        // Enforce side-specific rules for concepts and their "Pump" versions
         return baseList.filter(c => {
             const isSpreadOrSplit = formationName === 'Spread' || formationName === 'Split';
             if (c.startsWith('Murrey') && (!is3x1 || side !== 'right' || !formationHasRightStrongSide)) return false;
@@ -147,27 +201,27 @@ export const generatePlay = (conceptLibrary: ConceptLibrary): Play => {
         });
     };
     
-    // Choose full field concept?
-    const availableFullField = Object.keys(conceptLibrary).filter(c => conceptLibrary[c].category === 'full' && conceptLibrary[c].routes.length >= receivers.length);
-    if (Math.random() < 0.2 && receivers.length === 4 && availableFullField.length > 0) {
+    const availableFullField = getAvailableConcepts(finalReceivers.length, 'right', conceptLibrary);
+    if (finalReceivers.length >= 4 && Math.random() < 0.2 && availableFullField.length > 0) {
         let conceptName = getRandomElement(availableFullField);
         if (conceptName === 'Mesh' && !is2x2) {
-           conceptName = 'Verts'; // Fallback if mesh is chosen for non 2x2
+           conceptName = 'Verts'; 
         }
         playConceptsString = conceptName;
         
-        if (conceptName === 'Mesh') {
+        if (conceptName === 'Mesh' && routeLibrary['Out'] && routeLibrary['LDrag'] && routeLibrary['Drag']) {
             const outsideLeft = leftReceivers[0];
             const insideLeft = leftReceivers[1];
             const outsideRight = rightReceivers[0];
             const insideRight = rightReceivers[1];
 
-            finalRoutes[outsideLeft] = { routeName: 'Out', path: getMirroredPath(ROUTE_LIBRARY['Out']) };
-            finalRoutes[outsideRight] = { routeName: 'Out', path: ROUTE_LIBRARY['Out'] };
-            finalRoutes[insideLeft] = { routeName: 'Drag', path: ROUTE_LIBRARY['LDrag'] }; // LDrag goes right
-            finalRoutes[insideRight] = { routeName: 'Drag', path: ROUTE_LIBRARY['Drag'] }; // Drag goes left
+            finalRoutes[outsideLeft] = { routeName: 'Out', path: getMirroredPath(routeLibrary['Out']) };
+            finalRoutes[outsideRight] = { routeName: 'Out', path: routeLibrary['Out'] };
+            finalRoutes[insideLeft] = { routeName: 'Drag', path: routeLibrary['LDrag'] };
+            finalRoutes[insideRight] = { routeName: 'Drag', path: routeLibrary['Drag'] };
         } else {
-             const assignments = assignRoutesToReceivers(conceptName, receivers, true, conceptLibrary);
+            const allSortedReceivers = [...leftReceivers.sort((a,b) => finalFormation[a].x - finalFormation[b].x), ...rightReceivers.sort((a,b) => finalFormation[a].x - finalFormation[b].x)];
+            const assignments = assignRoutesToReceivers(conceptName, allSortedReceivers, true, conceptLibrary, routeLibrary);
             leftReceivers.forEach(rec => {
                if (assignments[rec]) {
                    assignments[rec].path = getMirroredPath(assignments[rec].path);
@@ -176,92 +230,21 @@ export const generatePlay = (conceptLibrary: ConceptLibrary): Play => {
             finalRoutes = assignments;
         }
 
-    } else { // Choose side concepts
+    } else { 
         rightConcept = getRandomElement(getAvailableConcepts(rightReceivers.length, 'right', conceptLibrary));
         leftConcept = getRandomElement(getAvailableConcepts(leftReceivers.length, 'left', conceptLibrary));
 
-        const rightAssignments = assignRoutesToReceivers(rightConcept, rightReceivers, true, conceptLibrary);
-        const leftAssignments = assignRoutesToReceivers(leftConcept, leftReceivers, false, conceptLibrary);
+        const rightAssignments = assignRoutesToReceivers(rightConcept, rightReceivers, true, conceptLibrary, routeLibrary);
+        const leftAssignments = assignRoutesToReceivers(leftConcept, leftReceivers, false, conceptLibrary, routeLibrary);
         finalRoutes = { ...rightAssignments, ...leftAssignments };
 
         playConceptsString = formationHasRightStrongSide || formationName.toLowerCase().includes('r') 
             ? `${rightConcept} / ${leftConcept}` 
             : `${leftConcept} / ${rightConcept}`;
-
-        // Overrides for special formation-dependent concepts
-        const isSpreadOrSplit = formationName === 'Spread' || formationName === 'Split';
-        if (leftConcept && leftConcept.startsWith('Wilma') && isSpreadOrSplit) {
-            receivers.forEach(r => {
-                const isLeft = leftReceivers.includes(r);
-                finalRoutes[r] = { routeName: 'Block', path: isLeft ? getMirroredPath(ROUTE_LIBRARY['Block']) : ROUTE_LIBRARY['Block'] };
-            });
-            if (formationName === 'Spread') { // W is left, Z is right
-                finalRoutes['W'] = { routeName: 'Step', path: getMirroredPath(ROUTE_LIBRARY['Step']) };
-                finalRoutes['S'] = { routeName: 'Bubble', path: getMirroredPath(ROUTE_LIBRARY['Bubble'])};
-            } else { // Split: Z is left, W is right
-                finalRoutes['Z'] = { routeName: 'Step', path: getMirroredPath(ROUTE_LIBRARY['Step']) };
-                finalRoutes['S'] = { routeName: 'Bubble', path: getMirroredPath(ROUTE_LIBRARY['Bubble'])};
-            }
-        } else if (rightConcept && rightConcept.startsWith('Zander') && isSpreadOrSplit) {
-            receivers.forEach(r => {
-                const isLeft = leftReceivers.includes(r);
-                finalRoutes[r] = { routeName: 'Block', path: isLeft ? getMirroredPath(ROUTE_LIBRARY['Block']) : ROUTE_LIBRARY['Block'] };
-            });
-            if (formationName === 'Spread') { // Z is right, W is left
-                finalRoutes['Z'] = { routeName: 'Step', path: ROUTE_LIBRARY['Step'] };
-                finalRoutes['H'] = { routeName: 'Bubble', path: ROUTE_LIBRARY['Bubble'] };
-            } else { // Split: W is right, Z is left
-                finalRoutes['W'] = { routeName: 'Step', path: ROUTE_LIBRARY['Step'] };
-                finalRoutes['H'] = { routeName: 'Bubble', path: ROUTE_LIBRARY['Bubble'] };
-            }
-        } else if (rightConcept && rightConcept.startsWith('Ringo')) {
-            const blockPath = ROUTE_LIBRARY['Block'];
-            receivers.forEach(r => {
-                const isLeft = leftReceivers.includes(r);
-                finalRoutes[r] = { routeName: 'Block', path: isLeft ? getMirroredPath(blockPath) : blockPath };
-            });
-            const innermostRight = rightReceivers[rightReceivers.length - 1];
-            const outermostLeft = leftReceivers[0];
-            finalRoutes[innermostRight] = { routeName: 'Bubble', path: ROUTE_LIBRARY['Bubble'] };
-            if (outermostLeft && direction.startsWith('4')) {
-                finalRoutes[outermostLeft] = { routeName: 'Bubble', path: getMirroredPath(ROUTE_LIBRARY['Bubble']) };
-            }
-        } else if (leftConcept && leftConcept.startsWith('Linda')) {
-            const blockPath = ROUTE_LIBRARY['Block'];
-            receivers.forEach(r => {
-                const isLeft = leftReceivers.includes(r);
-                finalRoutes[r] = { routeName: 'Block', path: isLeft ? getMirroredPath(blockPath) : blockPath };
-            });
-            const innermostLeft = leftReceivers[leftReceivers.length - 1];
-            const outermostRight = rightReceivers[0];
-            finalRoutes[innermostLeft] = { routeName: 'Bubble', path: getMirroredPath(ROUTE_LIBRARY['Bubble']) };
-            if (outermostRight && direction.startsWith('4')) {
-                 finalRoutes[outermostRight] = { routeName: 'Bubble', path: ROUTE_LIBRARY['Bubble'] };
-            }
-        } else if (rightConcept && rightConcept.startsWith('Murrey')) {
-            const middleReceiver = rightReceivers[1];
-            rightReceivers.forEach(rec => {
-                const routeName = rec === middleReceiver ? 'Step' : 'Block';
-                finalRoutes[rec] = { routeName, path: ROUTE_LIBRARY[routeName] };
-            });
-        } else if (leftConcept && leftConcept.startsWith('Melody')) {
-            const middleReceiver = leftReceivers[1];
-            leftReceivers.forEach(rec => {
-                const routeName = rec === middleReceiver ? 'Step' : 'Block';
-                finalRoutes[rec] = { routeName, path: getMirroredPath(ROUTE_LIBRARY[routeName]) };
-            });
-        }
     }
 
-    // 3. MOTIONS
-    const hMotion = getRandomWeightedElement(Object.values(H_MOTIONS), H_WEIGHTS);
-    const wMotion = getRandomWeightedElement(Object.values(W_MOTIONS), W_WEIGHTS);
-    const sMotion = getRandomWeightedElement(Object.values(S_MOTIONS), S_WEIGHTS);
-    const zMotion = getRandomWeightedElement(Object.values(Z_MOTIONS), Z_WEIGHTS);
-    const playMotion = getRandomWeightedElement(Object.values(PLAY_MOTIONS), PLAY_MOTION_WEIGHTS);
-
-    // 4. FINAL PLAYCALL
-    const finalPlayCall = [formationName, direction, hMotion, sMotion, wMotion, zMotion, playMotion, playConceptsString]
+    // 6. FINAL PLAYCALL
+    const finalPlayCall = [formationName, direction, ...motionCalls, playMotion, playConceptsString]
         .filter(part => part && part.trim() !== '' && part !== 'null')
         .join(' ');
 
@@ -269,5 +252,6 @@ export const generatePlay = (conceptLibrary: ConceptLibrary): Play => {
         playcall: finalPlayCall,
         formationName: formationName,
         routes: finalRoutes,
+        motions: appliedMotions
     };
 };

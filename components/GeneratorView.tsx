@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PlayDiagram } from './PlayDiagram';
-import { Play, ConceptLibrary } from '../types';
+import { Play, ConceptLibrary, MotionLibrary, RouteLibrary } from '../types';
 import { generatePlay } from '../services/playbookService';
-import { ROUTE_LIBRARY } from '../constants';
 
 interface GeneratorViewProps {
   conceptLibrary: ConceptLibrary;
+  motionLibrary: MotionLibrary;
+  routeLibrary: RouteLibrary;
   onOpenManager: () => void;
   onBackToMenu: () => void;
   displayMode: 'both' | 'diagramOnly' | 'playcallOnly';
 }
 
-export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, onOpenManager, onBackToMenu, displayMode }) => {
+export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, motionLibrary, routeLibrary, onOpenManager, onBackToMenu, displayMode }) => {
   const [currentPlay, setCurrentPlay] = useState<Play | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
@@ -26,7 +27,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
     isMatch: boolean;
   }> | null>(null);
 
-  const allRoutes = useMemo(() => Object.keys(ROUTE_LIBRARY).sort(), []);
+  const allRoutes = useMemo(() => Object.keys(routeLibrary).sort(), [routeLibrary]);
 
   const handleGeneratePlay = useCallback(() => {
     setIsLoading(true);
@@ -35,7 +36,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
     setAnswerDetails(null);
 
     setTimeout(() => {
-      const newPlay = generatePlay(conceptLibrary);
+      const newPlay = generatePlay(conceptLibrary, motionLibrary, routeLibrary);
       setCurrentPlay(newPlay);
 
       // Initialize selections for the new play's receivers
@@ -47,7 +48,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
 
       setIsLoading(false);
     }, 200);
-  }, [conceptLibrary]);
+  }, [conceptLibrary, motionLibrary, routeLibrary]);
 
   useEffect(() => {
     handleGeneratePlay();
@@ -157,7 +158,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, on
                 onClick={onOpenManager}
                 className="bg-gray-700 hover:bg-gray-600 text-yellow-300 font-bold py-2 px-4 rounded-lg text-sm transition-colors duration-200"
             >
-                Manage Concepts
+                Manage Playbook
             </button>
            </div>
         </div>
