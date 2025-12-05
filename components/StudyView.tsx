@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { PlayDiagram } from './PlayDiagram';
 import { Play, ConceptLibrary, RouteLibrary, RoutePath, MotionLibrary } from '../types';
@@ -19,6 +20,7 @@ const getMirroredPath = (path: RoutePath): RoutePath => {
 export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibrary, motionLibrary, onBackToMenu }) => {
   const [studyMode, setStudyMode] = useState<StudyMode>('routes');
   const [selectedItem, setSelectedItem] = useState<string>('');
+  const [selectedFormation, setSelectedFormation] = useState<string>('Spread');
 
   const sortedRoutes = useMemo(() => Object.keys(routeLibrary).sort(), [routeLibrary]);
   const sortedConcepts = useMemo(() => Object.keys(conceptLibrary).sort(), [conceptLibrary]);
@@ -29,11 +31,32 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
     if (studyMode === 'routes') {
       setSelectedItem(sortedRoutes[0] || '');
     } else if (studyMode === 'concepts') {
-      setSelectedItem(sortedConcepts[0] || '');
+      const firstConcept = sortedConcepts[0] || '';
+      setSelectedItem(firstConcept);
+      // Default formation for first concept
+      if (firstConcept && conceptLibrary[firstConcept]?.compatibleFormations?.length) {
+          setSelectedFormation(conceptLibrary[firstConcept].compatibleFormations![0]);
+      } else {
+          setSelectedFormation('Spread');
+      }
     } else {
       setSelectedItem(sortedMotions[0] || '');
     }
-  }, [studyMode, sortedRoutes, sortedConcepts, sortedMotions]);
+  }, [studyMode, sortedRoutes, sortedConcepts, sortedMotions, conceptLibrary]);
+
+  // Update selected formation defaults when concept changes
+  const handleConceptChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const conceptName = e.target.value;
+      setSelectedItem(conceptName);
+      if (studyMode === 'concepts') {
+          const concept = conceptLibrary[conceptName];
+          if (concept && concept.compatibleFormations && concept.compatibleFormations.length > 0) {
+              if (!concept.compatibleFormations.includes(selectedFormation)) {
+                   setSelectedFormation(concept.compatibleFormations[0]);
+              }
+          }
+      }
+  }
 
   const studyPlay: Play | null = useMemo(() => {
     if (!selectedItem) return null;
@@ -55,35 +78,70 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       const concept = conceptLibrary[selectedItem];
       if (!concept) return null;
       
-      let formationName = 'Spread';
+      const formationName = selectedFormation;
       const assignments: Play['routes'] = {};
 
-      if (concept.category === 'three') {
-        formationName = 'Tri';
-        const triReceivers = ['Z', 'H', 'S']; // The 3 receivers on the right in Tri, ordered right-to-left
-        concept.routes.forEach((routeName, i) => {
-            const receiver = triReceivers[i];
-            if (receiver && routeName && routeLibrary[routeName]) {
-                // All receivers are on the right, so no mirroring needed.
-                assignments[receiver] = { routeName, path: routeLibrary[routeName] };
-            }
-        });
+      const currentFormation = FORMATIONS[formationName] || FORMATIONS['Spread'];
+      const receivers = Object.keys(currentFormation);
+      
+      // Separate receivers by side (Center is 50%)
+      const rightReceivers = receivers.filter(r => currentFormation[r].x >= 50).sort((a,b) => currentFormation[b].x - currentFormation[a].x); // Descending (Outside-In)
+      const leftReceivers = receivers.filter(r => currentFormation[r].x < 50).sort((a,b) => currentFormation[a].x - currentFormation[b].x); // Ascending (Outside-In)
+
+      let targetReceivers: string[] = [];
+      let isRightSide = true;
+
+      // Logic to determine which receivers to highlight based on Concept Category and Formation
+      if (concept.category === 'full') {
+          // Flatten both sides, but maintain order. Left -> Right usually, but for assignment we usually go Left Out -> Right Out or similar.
+          // For visualization simplicity, let's just map 0..3 to whatever 4 receivers we have.
+          // BUT, to look nice, we try to grab the 4 widest.
+          const allRecs = [...leftReceivers, ...rightReceivers];
+          // Simple assignment
+          targetReceivers = allRecs;
+      } else if (concept.category === 'three') {
+          // Prioritize the side with 3 receivers (Trips)
+          if (rightReceivers.length >= 3) {
+              targetReceivers = rightReceivers.slice(0, 3);
+              isRightSide = true;
+          } else if (leftReceivers.length >= 3) {
+              targetReceivers = leftReceivers.slice(0, 3);
+              isRightSide = false;
+          } else {
+              // Fallback if no 3x1 side exists (e.g. Spread 2x2), just show on right side if possible or mix
+               targetReceivers = rightReceivers.concat(leftReceivers).slice(0, 3);
+          }
+      } else if (concept.category === 'two') {
+          // Prioritize Right side default
+          if (rightReceivers.length >= 2) {
+              targetReceivers = rightReceivers.slice(0, 2);
+              isRightSide = true;
+          } else if (leftReceivers.length >= 2) {
+              targetReceivers = leftReceivers.slice(0, 2);
+              isRightSide = false;
+          } else {
+              targetReceivers = [rightReceivers[0], leftReceivers[0]].filter(Boolean);
+          }
       } else {
-        // Default logic for 1, 2, and 4 receiver concepts using Spread
-        formationName = 'Spread';
-        const spreadReceivers = ['Z', 'H', 'S', 'W']; // Right to left
-        concept.routes.forEach((routeName, i) => {
-            const receiver = spreadReceivers[i];
+          // One receiver (ISO)
+           targetReceivers = [rightReceivers[0] || leftReceivers[0]];
+      }
+
+      concept.routes.forEach((routeName, i) => {
+          if (i < targetReceivers.length) {
+            const receiver = targetReceivers[i];
             if (receiver && routeName && routeLibrary[routeName]) {
                 let path = routeLibrary[routeName];
-                // Mirror for left-side receivers (S and W)
-                if (receiver === 'S' || receiver === 'W') {
+                const recPos = currentFormation[receiver];
+                // Mirror if receiver is on the left OR if we determined the concept is applied to the left side 
+                // (Checking actual position is safer)
+                if (recPos.x < 50) {
                     path = getMirroredPath(path);
                 }
                 assignments[receiver] = { routeName, path };
             }
-        });
-      }
+          }
+      });
       
       return {
         playcall: `Concept: ${selectedItem}`,
@@ -110,13 +168,22 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
     }
 
     return null;
-  }, [selectedItem, studyMode, routeLibrary, conceptLibrary, motionLibrary]);
+  }, [selectedItem, studyMode, routeLibrary, conceptLibrary, motionLibrary, selectedFormation]);
 
   const handleSelectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedItem(e.target.value);
   };
   
   const options = studyMode === 'routes' ? sortedRoutes : studyMode === 'concepts' ? sortedConcepts : sortedMotions;
+  
+  const availableFormations = useMemo(() => {
+      if (studyMode !== 'concepts' || !selectedItem) return [];
+      const concept = conceptLibrary[selectedItem];
+      if (concept?.compatibleFormations && concept.compatibleFormations.length > 0) {
+          return concept.compatibleFormations;
+      }
+      return Object.keys(FORMATIONS);
+  }, [studyMode, selectedItem, conceptLibrary]);
 
   return (
     <div className="w-full h-full flex flex-col items-center">
@@ -137,8 +204,8 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
       </header>
 
       <main className="w-full max-w-5xl flex-grow flex flex-col items-center bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6">
-        <div className="w-full md:w-2/3 lg:w-1/2 bg-gray-900 p-3 rounded-lg mb-4 flex items-center space-x-4">
-          <div className="flex-1">
+        <div className="w-full md:w-3/4 bg-gray-900 p-3 rounded-lg mb-4 flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
+          <div className="flex-1 w-full">
              <div className="flex space-x-1 bg-gray-700 rounded-lg p-1">
                 <button onClick={() => setStudyMode('routes')} className={`w-full py-2 rounded-md text-sm font-bold transition-colors ${studyMode === 'routes' ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-600'}`}>
                     Routes
@@ -151,14 +218,24 @@ export const StudyView: React.FC<StudyViewProps> = ({ conceptLibrary, routeLibra
                 </button>
              </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 w-full flex space-x-2">
             <select
                 value={selectedItem}
-                onChange={handleSelectionChange}
-                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500 h-full"
+                onChange={handleConceptChange}
+                className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
             >
                 {options.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
+             {studyMode === 'concepts' && (
+                <select
+                    value={selectedFormation}
+                    onChange={(e) => setSelectedFormation(e.target.value)}
+                    className="w-1/3 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+                    title="Select Formation for Diagram"
+                >
+                    {availableFormations.map(fmt => <option key={fmt} value={fmt}>{fmt}</option>)}
+                </select>
+            )}
           </div>
         </div>
 

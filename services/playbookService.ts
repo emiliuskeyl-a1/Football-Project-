@@ -1,3 +1,4 @@
+
 import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition, MotionLibrary, PlayerPosition, RouteLibrary } from '../types';
 import { 
     FORMATIONS,
@@ -6,8 +7,9 @@ import {
 
 const FORMATION_NAMES = Object.keys(FORMATIONS);
 const DIRECTIONS = { 1: "31", 2: "35", 3: "49", 4: "61", 5: "51", 6: "32", 7: "36", 8: "48", 9: "62" };
-const PLAY_MOTIONS = { 1: "Sugar", 2: "S Jet", 3: "W Jet", 4: "Wunder", 5: "Hexit", 6: "" };
-const PLAY_MOTION_WEIGHTS = [1, 1, 1, 1, 1, 10];
+// Removed Sugar, S Jet, W Jet. Only Wunder and Hexit remain, plus empty option.
+const PLAY_MOTIONS = { 1: "Wunder", 2: "Hexit", 3: "" };
+const PLAY_MOTION_WEIGHTS = [1, 1, 8];
 
 
 // --- Helper Functions ---
@@ -59,9 +61,19 @@ function applyMotions(
             const startPos = baseFormation[receiver];
             const endPoint = motionPath[motionPath.length - 1];
             
+            const newX = startPos.x + (endPoint.x * YARDS_TO_PERCENT_X);
+            const newY = startPos.y - endPoint.y;
+
+            // CHECK: Prevent motion from going out of bounds (off screen)
+            // Margins: Keep players between 2% and 98% of width
+            if (newX < 2 || newX > 98) {
+                console.warn(`Motion ${motionName} for ${receiver} skipped: Out of bounds (${newX.toFixed(1)}%)`);
+                continue; 
+            }
+
             // Adjust final position based on the motion
-            finalFormation[receiver].x = startPos.x + (endPoint.x * YARDS_TO_PERCENT_X);
-            finalFormation[receiver].y = startPos.y - endPoint.y; // Y is inverted in diagram logic
+            finalFormation[receiver].x = newX;
+            finalFormation[receiver].y = newY; // Y is inverted in diagram logic
 
             appliedMotions.push({ receiver, motionName, path: motionPath });
         }
@@ -71,12 +83,17 @@ function applyMotions(
 
 
 function assignRoutesToReceivers(
-    conceptName: string, 
+    conceptName: string | null, 
     receivers: string[],
     isRightSide: boolean,
     conceptLibrary: ConceptLibrary,
     routeLibrary: RouteLibrary
 ): { [receiver: string]: { routeName: string; path: RoutePath } } {
+    if (!conceptName) {
+        // Fallback for null concepts (e.g., if generator failed to pick one)
+        conceptName = "Verts";
+    }
+
     let conceptDef = conceptLibrary[conceptName];
     
     // Handle single-route concepts passed by name (e.g., "Hook", "Fade")
@@ -100,6 +117,8 @@ function assignRoutesToReceivers(
     
     for (let i = 0; i < receivers.length; i++) {
         const receiver = receivers[i];
+        // Standard Football Logic: Concepts are assigned Outside-In.
+        // The receivers array passed here MUST be sorted Outside-In.
         const routeName = conceptRoutes[i % conceptRoutes.length];
         
         if (routeName && routeLibrary[routeName]) {
@@ -127,7 +146,7 @@ function assignRoutesToReceivers(
 
 export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: MotionLibrary, routeLibrary: RouteLibrary): Play => {
     // 1. BASE FORMATION
-    const formationName = getRandomElement(FORMATION_NAMES);
+    const formationName = getRandomElement(FORMATION_NAMES) || 'Spread';
     const baseFormation: Formation = FORMATIONS[formationName];
     const baseReceivers = Object.keys(baseFormation);
 
@@ -161,18 +180,28 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
 
     // 4. RE-CALCULATE RECEIVER SIDES BASED ON FINAL POSITIONS
     const finalReceivers = Object.keys(finalFormation);
-    const rightReceivers = finalReceivers.filter(r => finalFormation[r].x >= 50).sort((a,b) => finalFormation[b].x - finalFormation[a].x);
-    const leftReceivers = finalReceivers.filter(r => finalFormation[r].x < 50).sort((a,b) => finalFormation[a].x - finalFormation[b].x);
+    
+    // SORTING IS CRITICAL: Sort Outside-In for both sides.
+    // Center is 50.
+    // Right side (x >= 50): Descending x (90, 80, 70...) so array[0] is widest.
+    const rightReceivers = finalReceivers
+        .filter(r => finalFormation[r].x >= 50)
+        .sort((a,b) => finalFormation[b].x - finalFormation[a].x);
+        
+    // Left side (x < 50): Ascending x (10, 20, 30...) so array[0] is widest.
+    const leftReceivers = finalReceivers
+        .filter(r => finalFormation[r].x < 50)
+        .sort((a,b) => finalFormation[a].x - finalFormation[b].x);
 
     // 5. CONCEPTS & DIRECTION
-    const direction = DIRECTIONS[getRandomKey(DIRECTIONS)];
+    const direction = DIRECTIONS[getRandomKey(DIRECTIONS) as any];
     const formationHasRightStrongSide = ['Tri', 'Brunch', 'Spread'].includes(formationName);
     const formationHasLeftStrongSide = ['Angle', 'Lunch', 'Split'].includes(formationName);
     const is2x2 = rightReceivers.length === 2 && leftReceivers.length === 2;
     const is3x1 = (rightReceivers.length === 3 && leftReceivers.length === 1) || (leftReceivers.length === 3 && rightReceivers.length === 1);
 
-    let rightConcept: string;
-    let leftConcept: string;
+    let rightConcept: string | null = null;
+    let leftConcept: string | null = null;
     let finalRoutes: { [receiver: string]: { routeName: string; path: RoutePath } } = {};
     let playConceptsString = '';
 
@@ -190,7 +219,17 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
         let baseList = Object.keys(allConcepts).filter(c => allConcepts[c].category === category);
         
         return baseList.filter(c => {
+            const conceptDef = allConcepts[c];
+            
+            // Check Compatible Formations
+            if (conceptDef.compatibleFormations && conceptDef.compatibleFormations.length > 0) {
+                if (!conceptDef.compatibleFormations.includes(formationName)) {
+                    return false;
+                }
+            }
+
             const isSpreadOrSplit = formationName === 'Spread' || formationName === 'Split';
+            // Legacy/Name-based checks (can be replaced by compatibleFormations eventually)
             if (c.startsWith('Murrey') && (!is3x1 || side !== 'right' || !formationHasRightStrongSide)) return false;
             if (c.startsWith('Melody') && (!is3x1 || side !== 'left' || !formationHasLeftStrongSide)) return false;
             if (c.startsWith('Ringo') && (side !== 'right' || !formationHasRightStrongSide)) return false;
@@ -202,8 +241,10 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
     };
     
     const availableFullField = getAvailableConcepts(finalReceivers.length, 'right', conceptLibrary);
+    
+    // Chance to run a Full Field concept if we have enough receivers total
     if (finalReceivers.length >= 4 && Math.random() < 0.2 && availableFullField.length > 0) {
-        let conceptName = getRandomElement(availableFullField);
+        let conceptName = getRandomElement(availableFullField) || 'Verts';
         if (conceptName === 'Mesh' && !is2x2) {
            conceptName = 'Verts'; 
         }
@@ -215,18 +256,18 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
             const outsideRight = rightReceivers[0];
             const insideRight = rightReceivers[1];
 
-            finalRoutes[outsideLeft] = { routeName: 'Out', path: getMirroredPath(routeLibrary['Out']) };
-            finalRoutes[outsideRight] = { routeName: 'Out', path: routeLibrary['Out'] };
-            finalRoutes[insideLeft] = { routeName: 'Drag', path: routeLibrary['LDrag'] };
-            finalRoutes[insideRight] = { routeName: 'Drag', path: routeLibrary['Drag'] };
+            if (outsideLeft) finalRoutes[outsideLeft] = { routeName: 'Out', path: getMirroredPath(routeLibrary['Out']) };
+            if (outsideRight) finalRoutes[outsideRight] = { routeName: 'Out', path: routeLibrary['Out'] };
+            if (insideLeft) finalRoutes[insideLeft] = { routeName: 'Drag', path: routeLibrary['LDrag'] };
+            if (insideRight) finalRoutes[insideRight] = { routeName: 'Drag', path: routeLibrary['Drag'] };
         } else {
-            // Refactored to use the simpler and more robust split-field assignment logic
             const rightAssignments = assignRoutesToReceivers(conceptName, rightReceivers, true, conceptLibrary, routeLibrary);
             const leftAssignments = assignRoutesToReceivers(conceptName, leftReceivers, false, conceptLibrary, routeLibrary);
             finalRoutes = { ...rightAssignments, ...leftAssignments };
         }
 
     } else { 
+        // Split Field Concepts
         rightConcept = getRandomElement(getAvailableConcepts(rightReceivers.length, 'right', conceptLibrary));
         leftConcept = getRandomElement(getAvailableConcepts(leftReceivers.length, 'left', conceptLibrary));
 
@@ -234,9 +275,20 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
         const leftAssignments = assignRoutesToReceivers(leftConcept, leftReceivers, false, conceptLibrary, routeLibrary);
         finalRoutes = { ...rightAssignments, ...leftAssignments };
 
-        playConceptsString = formationHasRightStrongSide || formationName.toLowerCase().includes('r') 
-            ? `${rightConcept} / ${leftConcept}` 
-            : `${leftConcept} / ${rightConcept}`;
+        // Playcall String Construction
+        const parts: string[] = [];
+        // Determine text order based on original formation strength, 
+        // effectively calling the "Left" concept first if Left Strong.
+        const isRightStrong = formationHasRightStrongSide || formationName.toLowerCase().includes('r');
+
+        if (isRightStrong) {
+            if (rightConcept) parts.push(rightConcept);
+            if (leftConcept) parts.push(leftConcept);
+        } else {
+             if (leftConcept) parts.push(leftConcept);
+             if (rightConcept) parts.push(rightConcept);
+        }
+        playConceptsString = parts.join(' / ');
     }
 
     // 6. FINAL PLAYCALL

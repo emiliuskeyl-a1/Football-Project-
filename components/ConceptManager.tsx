@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, MouseEvent, useMemo } from 'react';
 import { ConceptLibrary, ConceptDefinition, MotionLibrary, RoutePath, Point, RouteLibrary, Play } from '../types';
 import { FORMATIONS } from '../constants';
@@ -146,6 +147,11 @@ const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibra
             case 'concept': {
                 const concept = conceptLibrary[item.name];
                 if (!concept) return null;
+                // Use the first compatible formation if available, otherwise default to Spread
+                const defaultFormation = (concept.compatibleFormations && concept.compatibleFormations.length > 0) 
+                    ? concept.compatibleFormations[0] 
+                    : 'Spread';
+
                 const receivers = ['Z', 'H', 'S', 'W'];
                 const assignments: Play['routes'] = {};
                 const numRoutes = concept.routes.length;
@@ -164,7 +170,7 @@ const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibra
                 }
                 return {
                     playcall: `Concept: ${item.name}`,
-                    formationName: 'Spread',
+                    formationName: defaultFormation,
                     routes: assignments,
                     motions: [],
                 };
@@ -207,7 +213,7 @@ interface ConceptEditorProps {
     concepts: ConceptLibrary;
     allRoutes: string[];
     onAddConcept: ConceptManagerProps['onAddConcept'];
-    onDeleteConcept: ConceptManagerProps['onDeleteConcept'];
+    onDeleteConcept: (name: string) => void;
     onViewConcept: (name: string) => void;
 }
 const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAddConcept, onDeleteConcept, onViewConcept }) => {
@@ -217,13 +223,27 @@ const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAd
     const [sRoute, setSRoute] = useState(allRoutes[0] || '');
     const [wRoute, setWRoute] = useState(allRoutes[0] || '');
     const [category, setCategory] = useState<ConceptDefinition['category']>('two');
+    const [compatibleFormations, setCompatibleFormations] = useState<string[]>([]);
+
+    const allFormations = Object.keys(FORMATIONS);
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const newRoutes = [zRoute, hRoute, sRoute, wRoute].slice(0, category === 'one' ? 1 : category === 'two' ? 2 : category === 'three' ? 3 : 4);
-        onAddConcept(newConceptName.trim(), { routes: newRoutes, category });
+        onAddConcept(newConceptName.trim(), { 
+            routes: newRoutes, 
+            category,
+            compatibleFormations: compatibleFormations.length > 0 ? compatibleFormations : undefined
+        });
         setNewConceptName('');
+        setCompatibleFormations([]);
     };
+    
+    const toggleFormation = (fmt: string) => {
+        setCompatibleFormations(prev => 
+            prev.includes(fmt) ? prev.filter(f => f !== fmt) : [...prev, fmt]
+        );
+    }
 
     const sortedConcepts = Object.entries(concepts).sort((a, b) => a[0].localeCompare(b[0]));
     const categoryLabels: Record<ConceptDefinition['category'], string> = { one: '1 Receiver (ISO)', two: '2 Receivers', three: '3 Receivers', full: 'Full Field (4 Receivers)' };
@@ -243,7 +263,26 @@ const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAd
                 {visibleSelectors >= 2 && <RouteSelect label="Right Slot (H)" value={hRoute} onChange={setHRoute} allRoutes={allRoutes} />}
                 {visibleSelectors >= 3 && <RouteSelect label="Left Slot (S)" value={sRoute} onChange={setSRoute} allRoutes={allRoutes} />}
                 {visibleSelectors >= 4 && <RouteSelect label="Far Left (W)" value={wRoute} onChange={setWRoute} allRoutes={allRoutes} />}
-                <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Add Concept</button>
+                
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-300">Compatible Formations (Optional):</label>
+                    <p className="text-xs text-gray-500">If none selected, works with all.</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-gray-700 p-2 rounded-md max-h-32 overflow-y-auto">
+                        {allFormations.map(fmt => (
+                            <label key={fmt} className="flex items-center space-x-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={compatibleFormations.includes(fmt)} 
+                                    onChange={() => toggleFormation(fmt)}
+                                    className="rounded border-gray-500 text-blue-500 focus:ring-blue-500 bg-gray-800"
+                                />
+                                <span className="text-xs text-white">{fmt}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save Concept</button>
                 </form>
             </div>
             <div className="bg-gray-900 p-4 rounded-lg flex flex-col">
@@ -251,11 +290,16 @@ const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAd
                 <ul className="space-y-2 flex-grow overflow-y-auto pr-2 max-h-[55vh]">
                 {(sortedConcepts as [string, ConceptDefinition][]).map(([name, concept]) => (
                     <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
-                    <div>
+                    <div className="flex-grow pr-2">
                         <p className="font-bold text-blue-400">{name}</p>
                         <p className="text-xs text-gray-400 capitalize">{concept.category} - {concept.routes.join(', ')}</p>
+                         {concept.compatibleFormations && concept.compatibleFormations.length > 0 && (
+                            <p className="text-[10px] text-gray-500 mt-1">
+                                Formations: {concept.compatibleFormations.join(', ')}
+                            </p>
+                        )}
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-6 flex-shrink-0">
                         <IconButton onClick={() => onViewConcept(name)} title="View Concept">
                             <EyeIcon />
                         </IconButton>
@@ -270,7 +314,8 @@ const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAd
 };
 
 // --- Motion Editor Component ---
-interface MotionEditorProps extends Pick<ConceptManagerProps, 'motions' | 'onAddMotion' | 'onDeleteMotion'> {
+interface MotionEditorProps extends Pick<ConceptManagerProps, 'motions' | 'onAddMotion' > {
+    onDeleteMotion: (name: string) => void;
     onViewMotion: (name: string) => void;
 }
 const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDeleteMotion, onViewMotion }) => {
@@ -354,7 +399,7 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
                     <p className="font-bold text-blue-400">{name}</p>
                     <p className="text-xs text-gray-400">For Receiver: <span className="font-semibold text-yellow-300">{motionData.receiver}</span></p>
                 </div>
-                 <div className="flex items-center space-x-2">
+                 <div className="flex items-center space-x-6">
                     <IconButton onClick={() => onViewMotion(name)} title="View Motion">
                         <EyeIcon />
                     </IconButton>
@@ -370,7 +415,8 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
 
 
 // --- Route Editor Component ---
-interface RouteEditorProps extends Pick<ConceptManagerProps, 'routes' | 'onAddRoute' | 'onDeleteRoute'> {
+interface RouteEditorProps extends Pick<ConceptManagerProps, 'routes' | 'onAddRoute'> {
+    onDeleteRoute: (name: string) => void;
     onViewRoute: (name: string) => void;
 }
 const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteRoute, onViewRoute }) => {
@@ -398,16 +444,26 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
             alert('Please provide a name and draw a path for the route.');
             return;
         }
+        // Always starts at 0,0 (LOS)
         const finalPath = [{ x: 0, y: 0 }, ...currentPath];
         onAddRoute(newRouteName.trim(), finalPath);
         setNewRouteName('');
         setCurrentPath([]);
     };
 
+    const handleEditRoute = (name: string) => {
+        const path = routes[name];
+        if (path) {
+            setNewRouteName(name);
+            // Remove the first point (0,0) as the editor implies it, and the drawer adds relative points
+            setCurrentPath(path.slice(1)); 
+        }
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-gray-900 p-4 rounded-lg space-y-4">
-                <h3 className="text-xl font-semibold text-yellow-300 border-b border-gray-700 pb-2">Add New Route</h3>
+                <h3 className="text-xl font-semibold text-yellow-300 border-b border-gray-700 pb-2">Add / Edit Route</h3>
                 <FormInput id="route-name" label="Route Name" value={newRouteName} onChange={setNewRouteName} placeholder="e.g., Deep Corner" required />
                 <p className="block text-sm font-medium text-gray-300">Click on the field to draw the path (starts from line of scrimmage).</p>
                 <div className="w-full aspect-square bg-blue-900/50 border-2 border-dashed border-gray-600 rounded-lg cursor-crosshair">
@@ -424,8 +480,10 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
                     </svg>
                 </div>
                 <div className="flex space-x-2">
-                    <button onClick={handleSaveRoute} className="flex-grow bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save Route</button>
-                    <button onClick={() => setCurrentPath([])} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Clear Path</button>
+                    <button onClick={handleSaveRoute} className="flex-grow bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        {routes[newRouteName] ? 'Update Route' : 'Save Route'}
+                    </button>
+                    <button onClick={() => { setCurrentPath([]); setNewRouteName(''); }} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Clear</button>
                 </div>
             </div>
             <div className="bg-gray-900 p-4 rounded-lg flex flex-col">
@@ -434,9 +492,12 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
                     {sortedRoutes.map(([name, _]) => (
                         <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
                             <p className="font-bold text-blue-400">{name}</p>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-6">
                                 <IconButton onClick={() => onViewRoute(name)} title="View Route">
                                     <EyeIcon />
+                                </IconButton>
+                                <IconButton onClick={() => handleEditRoute(name)} title="Edit Route">
+                                    <PencilIcon />
                                 </IconButton>
                                 <button onClick={() => onDeleteRoute(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
                             </div>
@@ -490,5 +551,11 @@ const EyeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+);
+
+const PencilIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
     </svg>
 );

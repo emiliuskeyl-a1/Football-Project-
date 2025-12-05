@@ -1,3 +1,4 @@
+
 export interface Point {
   x: number;
   y: number;
@@ -12,6 +13,7 @@ export interface RouteLibrary {
 export interface ConceptDefinition {
   routes: string[];
   category: 'one' | 'two' | 'three' | 'full';
+  compatibleFormations?: string[]; // Optional: restrict concept to specific formations
 }
 
 export interface ConceptLibrary {

@@ -1,3 +1,4 @@
+
 import { RouteLibrary, ConceptLibrary, FormationLibrary, MotionLibrary } from './types';
 
 // Coordinates are relative (in yards). X is horizontal, Y is vertical downfield.
@@ -91,14 +92,14 @@ export const FORMATIONS: FormationLibrary = {
     },
     "Tri": { 
         W: { x: 15, y: LINE_OF_SCRIMMAGE_Y }, 
-        S: { x: 65, y: LINE_OF_SCRIMMAGE_Y }, 
-        H: { x: 75, y: LINE_OF_SCRIMMAGE_Y + 2 }, 
+        H: { x: 65, y: LINE_OF_SCRIMMAGE_Y }, 
+        S: { x: 75, y: LINE_OF_SCRIMMAGE_Y + 2 }, 
         Z: { x: 85, y: LINE_OF_SCRIMMAGE_Y } 
     },
     "Angle": { 
         Z: { x: 15, y: LINE_OF_SCRIMMAGE_Y }, 
-        H: { x: 25, y: LINE_OF_SCRIMMAGE_Y + 2 }, 
-        S: { x: 35, y: LINE_OF_SCRIMMAGE_Y }, 
+        S: { x: 25, y: LINE_OF_SCRIMMAGE_Y + 2 }, 
+        H: { x: 35, y: LINE_OF_SCRIMMAGE_Y }, 
         W: { x: 85, y: LINE_OF_SCRIMMAGE_Y } 
     },
     "Lunch": { 
