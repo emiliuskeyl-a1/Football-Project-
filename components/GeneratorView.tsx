@@ -1,18 +1,20 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PlayDiagram } from './PlayDiagram';
-import { Play, ConceptLibrary, MotionLibrary, RouteLibrary } from '../types';
+import { Play, ConceptLibrary, MotionLibrary, RouteLibrary, ProtectionLibrary } from '../types';
 import { generatePlay } from '../services/playbookService';
 
 interface GeneratorViewProps {
   conceptLibrary: ConceptLibrary;
   motionLibrary: MotionLibrary;
   routeLibrary: RouteLibrary;
+  protectionLibrary: ProtectionLibrary;
   onOpenManager: () => void;
   onBackToMenu: () => void;
   displayMode: 'both' | 'diagramOnly' | 'playcallOnly';
 }
 
-export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, motionLibrary, routeLibrary, onOpenManager, onBackToMenu, displayMode }) => {
+export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, motionLibrary, routeLibrary, protectionLibrary, onOpenManager, onBackToMenu, displayMode }) => {
   const [currentPlay, setCurrentPlay] = useState<Play | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
@@ -36,7 +38,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, mo
     setAnswerDetails(null);
 
     setTimeout(() => {
-      const newPlay = generatePlay(conceptLibrary, motionLibrary, routeLibrary);
+      const newPlay = generatePlay(conceptLibrary, motionLibrary, routeLibrary, protectionLibrary);
       setCurrentPlay(newPlay);
 
       // Initialize selections for the new play's receivers
@@ -48,7 +50,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({ conceptLibrary, mo
 
       setIsLoading(false);
     }, 200);
-  }, [conceptLibrary, motionLibrary, routeLibrary]);
+  }, [conceptLibrary, motionLibrary, routeLibrary, protectionLibrary]);
 
   useEffect(() => {
     handleGeneratePlay();

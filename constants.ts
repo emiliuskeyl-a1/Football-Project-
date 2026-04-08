@@ -1,5 +1,5 @@
 
-import { RouteLibrary, ConceptLibrary, FormationLibrary, MotionLibrary } from './types';
+import { RouteLibrary, ConceptLibrary, FormationLibrary, MotionLibrary, ProtectionLibrary } from './types';
 
 // Coordinates are relative (in yards). X is horizontal, Y is vertical downfield.
 export const DEFAULT_ROUTE_LIBRARY: RouteLibrary = {
@@ -73,9 +73,21 @@ export const DEFAULT_CONCEPT_LIBRARY: ConceptLibrary = {
     "Hiker (3)": { routes: ["Hitch", "Hitch", "Hitch"], category: 'three' },
 };
 
+export const DEFAULT_PROTECTION_LIBRARY: ProtectionLibrary = {
+    "51": {
+        paths: {
+            "LT": [{x: 0, y: 0}, {x: -1, y: -1}, {x: -2, y: -2}, {x: -3, y: -3}],
+            "LG": [{x: 0, y: 0}, {x: 0, y: -1}, {x: 0, y: -2}],
+            "C": [{x: 0, y: 0}, {x: 0, y: -1}, {x: 0, y: -2}],
+            "RG": [{x: 0, y: 0}, {x: 0, y: -1}, {x: 0, y: -2}],
+            "RT": [{x: 0, y: 0}, {x: 1, y: -1}, {x: 2, y: -2}, {x: 3, y: -3}],
+        }
+    }
+};
+
 // Positions are % of width/height. Origin (0,0) is top-left.
-// Y: 80% is the Line of Scrimmage
-const LINE_OF_SCRIMMAGE_Y = 80;
+// Adjusted to 81.82 to sit exactly on a field line (9/11 segments)
+export const LINE_OF_SCRIMMAGE_Y = 81.82;
 
 export const FORMATIONS: FormationLibrary = {
     "Spread": { 
@@ -103,16 +115,16 @@ export const FORMATIONS: FormationLibrary = {
         W: { x: 85, y: LINE_OF_SCRIMMAGE_Y } 
     },
     "Lunch": { 
-        W: { x: 20, y: LINE_OF_SCRIMMAGE_Y + 4 }, 
-        H: { x: 25, y: LINE_OF_SCRIMMAGE_Y }, 
-        Z: { x: 30, y: LINE_OF_SCRIMMAGE_Y + 4},
-        S: { x: 80, y: LINE_OF_SCRIMMAGE_Y }
+        W: { x: 15, y: LINE_OF_SCRIMMAGE_Y }, 
+        H: { x: 25, y: LINE_OF_SCRIMMAGE_Y + 4 }, 
+        Z: { x: 35, y: LINE_OF_SCRIMMAGE_Y },
+        S: { x: 80, y: LINE_OF_SCRIMMAGE_Y + 2 }
     },
     "Brunch": { 
-        S: { x: 20, y: LINE_OF_SCRIMMAGE_Y }, 
-        Z: { x: 70, y: LINE_OF_SCRIMMAGE_Y + 4 },
-        H: { x: 75, y: LINE_OF_SCRIMMAGE_Y }, 
-        W: { x: 80, y: LINE_OF_SCRIMMAGE_Y + 4 }
+        S: { x: 20, y: LINE_OF_SCRIMMAGE_Y + 2 }, 
+        Z: { x: 65, y: LINE_OF_SCRIMMAGE_Y },
+        H: { x: 75, y: LINE_OF_SCRIMMAGE_Y + 4 }, 
+        W: { x: 85, y: LINE_OF_SCRIMMAGE_Y }
     }
 };
 

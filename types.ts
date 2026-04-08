@@ -20,6 +20,16 @@ export interface ConceptLibrary {
   [conceptName: string]: ConceptDefinition;
 }
 
+export interface ProtectionDefinition {
+  paths: {
+    [lineman: string]: RoutePath;
+  };
+}
+
+export interface ProtectionLibrary {
+  [protectionName: string]: ProtectionDefinition;
+}
+
 export interface PlayerPosition {
   x: number; // percentage of field width
   y: number; // percentage of field height from line of scrimmage
@@ -43,6 +53,8 @@ export interface MotionLibrary {
 export interface Play {
   playcall: string;
   formationName: string;
+  protectionName?: string;
+  protectionPaths?: { [lineman: string]: RoutePath };
   routes: {
     [receiver: string]: {
       routeName: string;

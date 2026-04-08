@@ -1,13 +1,12 @@
 
-import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition, MotionLibrary, PlayerPosition, RouteLibrary } from '../types';
+import { Play, Formation, RoutePath, ConceptLibrary, ConceptDefinition, MotionLibrary, PlayerPosition, RouteLibrary, ProtectionLibrary } from '../types';
 import { 
     FORMATIONS,
     PLAYS_ONE_REC,
 } from '../constants';
 
 const FORMATION_NAMES = Object.keys(FORMATIONS);
-const DIRECTIONS = { 1: "31", 2: "35", 3: "49", 4: "61", 5: "51", 6: "32", 7: "36", 8: "48", 9: "62" };
-// Removed Sugar, S Jet, W Jet. Only Wunder and Hexit remain, plus empty option.
+// Removed DIRECTIONS as it's replaced by Protections
 const PLAY_MOTIONS = { 1: "Wunder", 2: "Hexit", 3: "" };
 const PLAY_MOTION_WEIGHTS = [1, 1, 8];
 
@@ -144,7 +143,12 @@ function assignRoutesToReceivers(
     return assignments;
 }
 
-export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: MotionLibrary, routeLibrary: RouteLibrary): Play => {
+export const generatePlay = (
+    conceptLibrary: ConceptLibrary, 
+    motionLibrary: MotionLibrary, 
+    routeLibrary: RouteLibrary,
+    protectionLibrary: ProtectionLibrary
+): Play => {
     // 1. BASE FORMATION
     const formationName = getRandomElement(FORMATION_NAMES) || 'Spread';
     const baseFormation: Formation = FORMATIONS[formationName];
@@ -182,19 +186,20 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
     const finalReceivers = Object.keys(finalFormation);
     
     // SORTING IS CRITICAL: Sort Outside-In for both sides.
-    // Center is 50.
-    // Right side (x >= 50): Descending x (90, 80, 70...) so array[0] is widest.
     const rightReceivers = finalReceivers
         .filter(r => finalFormation[r].x >= 50)
         .sort((a,b) => finalFormation[b].x - finalFormation[a].x);
         
-    // Left side (x < 50): Ascending x (10, 20, 30...) so array[0] is widest.
     const leftReceivers = finalReceivers
         .filter(r => finalFormation[r].x < 50)
         .sort((a,b) => finalFormation[a].x - finalFormation[b].x);
 
-    // 5. CONCEPTS & DIRECTION
-    const direction = DIRECTIONS[getRandomKey(DIRECTIONS) as any];
+    // 5. PROTECTION (REPLACING DIRECTIONS)
+    const protectionNames = Object.keys(protectionLibrary);
+    const protectionName = getRandomElement(protectionNames) || '51';
+    const protectionPaths = protectionLibrary[protectionName]?.paths;
+
+    // 6. CONCEPTS
     const formationHasRightStrongSide = ['Tri', 'Brunch', 'Spread'].includes(formationName);
     const formationHasLeftStrongSide = ['Angle', 'Lunch', 'Split'].includes(formationName);
     const is2x2 = rightReceivers.length === 2 && leftReceivers.length === 2;
@@ -220,16 +225,12 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
         
         return baseList.filter(c => {
             const conceptDef = allConcepts[c];
-            
-            // Check Compatible Formations
             if (conceptDef.compatibleFormations && conceptDef.compatibleFormations.length > 0) {
                 if (!conceptDef.compatibleFormations.includes(formationName)) {
                     return false;
                 }
             }
-
             const isSpreadOrSplit = formationName === 'Spread' || formationName === 'Split';
-            // Legacy/Name-based checks (can be replaced by compatibleFormations eventually)
             if (c.startsWith('Murrey') && (!is3x1 || side !== 'right' || !formationHasRightStrongSide)) return false;
             if (c.startsWith('Melody') && (!is3x1 || side !== 'left' || !formationHasLeftStrongSide)) return false;
             if (c.startsWith('Ringo') && (side !== 'right' || !formationHasRightStrongSide)) return false;
@@ -242,7 +243,6 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
     
     const availableFullField = getAvailableConcepts(finalReceivers.length, 'right', conceptLibrary);
     
-    // Chance to run a Full Field concept if we have enough receivers total
     if (finalReceivers.length >= 4 && Math.random() < 0.2 && availableFullField.length > 0) {
         let conceptName = getRandomElement(availableFullField) || 'Verts';
         if (conceptName === 'Mesh' && !is2x2) {
@@ -267,7 +267,6 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
         }
 
     } else { 
-        // Split Field Concepts
         rightConcept = getRandomElement(getAvailableConcepts(rightReceivers.length, 'right', conceptLibrary));
         leftConcept = getRandomElement(getAvailableConcepts(leftReceivers.length, 'left', conceptLibrary));
 
@@ -275,10 +274,7 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
         const leftAssignments = assignRoutesToReceivers(leftConcept, leftReceivers, false, conceptLibrary, routeLibrary);
         finalRoutes = { ...rightAssignments, ...leftAssignments };
 
-        // Playcall String Construction
         const parts: string[] = [];
-        // Determine text order based on original formation strength, 
-        // effectively calling the "Left" concept first if Left Strong.
         const isRightStrong = formationHasRightStrongSide || formationName.toLowerCase().includes('r');
 
         if (isRightStrong) {
@@ -291,14 +287,16 @@ export const generatePlay = (conceptLibrary: ConceptLibrary, motionLibrary: Moti
         playConceptsString = parts.join(' / ');
     }
 
-    // 6. FINAL PLAYCALL
-    const finalPlayCall = [formationName, direction, ...motionCalls, playMotion, playConceptsString]
+    // 7. FINAL PLAYCALL (Now using protection name instead of direction)
+    const finalPlayCall = [formationName, protectionName, ...motionCalls, playMotion, playConceptsString]
         .filter(part => part && part.trim() !== '' && part !== 'null')
         .join(' ');
 
     return {
         playcall: finalPlayCall,
         formationName: formationName,
+        protectionName: protectionName,
+        protectionPaths: protectionPaths,
         routes: finalRoutes,
         motions: appliedMotions
     };

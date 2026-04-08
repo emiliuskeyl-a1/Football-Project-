@@ -4,9 +4,9 @@ import { ConceptManager } from './components/ConceptManager';
 import { MainMenu } from './components/MainMenu';
 import { GeneratorView } from './components/GeneratorView';
 import { StudyView } from './components/StudyView';
-import { Play, ConceptLibrary, ConceptDefinition, AppMode, MotionLibrary, RoutePath, RouteLibrary } from './types';
+import { Play, ConceptLibrary, ConceptDefinition, AppMode, MotionLibrary, RoutePath, RouteLibrary, ProtectionLibrary, ProtectionDefinition } from './types';
 import { generatePlay } from './services/playbookService';
-import { DEFAULT_CONCEPT_LIBRARY, DEFAULT_ROUTE_LIBRARY, DEFAULT_MOTION_LIBRARY } from './constants';
+import { DEFAULT_CONCEPT_LIBRARY, DEFAULT_ROUTE_LIBRARY, DEFAULT_MOTION_LIBRARY, DEFAULT_PROTECTION_LIBRARY } from './constants';
 
 const App: React.FC = () => {
   const [appMode, setAppMode] = useState<AppMode>('mainMenu');
@@ -45,6 +45,16 @@ const App: React.FC = () => {
     }
   });
 
+  const [protectionLibrary, setProtectionLibrary] = useState<ProtectionLibrary>(() => {
+    try {
+      const saved = localStorage.getItem('footballProtections');
+      return saved ? JSON.parse(saved) : DEFAULT_PROTECTION_LIBRARY;
+    } catch (error) {
+      console.error("Failed to load protections from localStorage", error);
+      return DEFAULT_PROTECTION_LIBRARY;
+    }
+  });
+
 
   useEffect(() => {
     try {
@@ -70,6 +80,14 @@ const App: React.FC = () => {
     }
   }, [routeLibrary]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('footballProtections', JSON.stringify(protectionLibrary));
+    } catch (error) {
+      console.error("Failed to save protections to localStorage", error);
+    }
+  }, [protectionLibrary]);
+
   const handleOpenManagerClick = () => {
     setPasswordInput('');
     setPasswordError('');
@@ -92,12 +110,8 @@ const App: React.FC = () => {
         alert('Concept name cannot be empty.');
         return;
     }
-    if (conceptLibrary[name]) {
-        alert(`Concept name "${name}" already exists!`);
-        return;
-    }
     setConceptLibrary(prev => ({ ...prev, [name]: concept }));
-    alert(`Concept "${name}" added successfully!`);
+    alert(`Concept "${name}" saved successfully!`);
   };
 
   const handleDeleteConcept = (name: string) => {
@@ -112,12 +126,8 @@ const App: React.FC = () => {
         alert('Motion name cannot be empty.');
         return;
     }
-    if (motionLibrary[name]) {
-        alert(`Motion name "${name}" already exists!`);
-        return;
-    }
     setMotionLibrary(prev => ({ ...prev, [name]: { path, receiver } }));
-    alert(`Motion "${name}" added successfully!`);
+    alert(`Motion "${name}" saved successfully!`);
   }
 
   const handleDeleteMotion = (name: string) => {
@@ -132,16 +142,28 @@ const App: React.FC = () => {
         alert('Route name cannot be empty.');
         return;
     }
-    if (routeLibrary[name]) {
-        alert(`Route name "${name}" already exists!`);
-        return;
-    }
     setRouteLibrary(prev => ({ ...prev, [name]: path }));
-    alert(`Route "${name}" added successfully!`);
+    alert(`Route "${name}" saved successfully!`);
   }
 
   const handleDeleteRoute = (name: string) => {
     setRouteLibrary(currentLibrary => {
+        const { [name]: _, ...newLibrary } = currentLibrary;
+        return newLibrary;
+    });
+  }
+
+  const handleAddProtection = (name: string, protection: ProtectionDefinition) => {
+    if (!name.trim()) {
+        alert('Protection name cannot be empty.');
+        return;
+    }
+    setProtectionLibrary(prev => ({ ...prev, [name]: protection }));
+    alert(`Protection "${name}" saved successfully!`);
+  }
+
+  const handleDeleteProtection = (name: string) => {
+    setProtectionLibrary(currentLibrary => {
         const { [name]: _, ...newLibrary } = currentLibrary;
         return newLibrary;
     });
@@ -154,6 +176,7 @@ const App: React.FC = () => {
         concepts: conceptLibrary,
         motions: motionLibrary,
         routes: routeLibrary,
+        protections: protectionLibrary,
       };
       const jsonString = JSON.stringify(config, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -185,6 +208,9 @@ const App: React.FC = () => {
             setConceptLibrary(config.concepts);
             setMotionLibrary(config.motions);
             setRouteLibrary(config.routes);
+            if (config.protections) {
+              setProtectionLibrary(config.protections);
+            }
             alert("Configuration imported successfully!");
         } else {
           throw new Error("Invalid configuration file format.");
@@ -202,11 +228,11 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (appMode) {
       case 'generator':
-        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="both" />;
+        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} protectionLibrary={protectionLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="both" />;
       case 'quizDiagram':
-        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="playcallOnly" />;
+        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} protectionLibrary={protectionLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="playcallOnly" />;
        case 'quizPlaycall':
-        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="diagramOnly" />;
+        return <GeneratorView conceptLibrary={conceptLibrary} motionLibrary={motionLibrary} routeLibrary={routeLibrary} protectionLibrary={protectionLibrary} onOpenManager={handleOpenManagerClick} onBackToMenu={() => setAppMode('mainMenu')} displayMode="diagramOnly" />;
       case 'study':
         return <StudyView conceptLibrary={conceptLibrary} routeLibrary={routeLibrary} motionLibrary={motionLibrary} onBackToMenu={() => setAppMode('mainMenu')} />;
       case 'mainMenu':
@@ -221,7 +247,7 @@ const App: React.FC = () => {
       
       {isPasswordPromptOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-sm:w-full max-w-sm">
             <h2 className="text-xl font-bold text-yellow-300 mb-4">Enter Password</h2>
             <p className="text-gray-400 mb-4">Please enter the password to access the Playbook Manager.</p>
             <form onSubmit={handlePasswordSubmit}>
@@ -252,12 +278,15 @@ const App: React.FC = () => {
         concepts={conceptLibrary}
         motions={motionLibrary}
         routes={routeLibrary}
+        protections={protectionLibrary}
         onAddConcept={handleAddConcept}
         onDeleteConcept={handleDeleteConcept}
         onAddMotion={handleAddMotion}
         onDeleteMotion={handleDeleteMotion}
         onAddRoute={handleAddRoute}
         onDeleteRoute={handleDeleteRoute}
+        onAddProtection={handleAddProtection}
+        onDeleteProtection={handleDeleteProtection}
         onExport={handleExportConfig}
         onImport={handleImportConfig}
       />

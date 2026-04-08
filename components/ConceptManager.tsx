@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, MouseEvent, useMemo } from 'react';
-import { ConceptLibrary, ConceptDefinition, MotionLibrary, RoutePath, Point, RouteLibrary, Play } from '../types';
-import { FORMATIONS } from '../constants';
+import { ConceptLibrary, ConceptDefinition, MotionLibrary, RoutePath, Point, RouteLibrary, Play, ProtectionLibrary, ProtectionDefinition } from '../types';
+import { FORMATIONS, LINE_OF_SCRIMMAGE_Y } from '../constants';
 import { PlayDiagram } from './PlayDiagram';
 
 
@@ -11,18 +11,21 @@ interface ConceptManagerProps {
   concepts: ConceptLibrary;
   motions: MotionLibrary;
   routes: RouteLibrary;
+  protections: ProtectionLibrary;
   onAddConcept: (name: string, concept: ConceptDefinition) => void;
   onDeleteConcept: (name: string) => void;
   onAddMotion: (name: string, path: RoutePath, receiver: string) => void;
   onDeleteMotion: (name: string) => void;
   onAddRoute: (name: string, path: RoutePath) => void;
   onDeleteRoute: (name: string) => void;
+  onAddProtection: (name: string, protection: ProtectionDefinition) => void;
+  onDeleteProtection: (name: string) => void;
   onExport: () => void;
   onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 type ViewingItem = {
-  type: 'concept' | 'motion' | 'route';
+  type: 'concept' | 'motion' | 'route' | 'protection';
   name: string;
 }
 
@@ -32,16 +35,19 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
   concepts,
   motions,
   routes,
+  protections,
   onAddConcept,
   onDeleteConcept,
   onAddMotion,
   onDeleteMotion,
   onAddRoute,
   onDeleteRoute,
+  onAddProtection,
+  onDeleteProtection,
   onExport,
   onImport,
 }) => {
-  const [activeTab, setActiveTab] = useState<'concepts' | 'motions' | 'routes'>('concepts');
+  const [activeTab, setActiveTab] = useState<'concepts' | 'motions' | 'routes' | 'protections'>('concepts');
   const [viewingItem, setViewingItem] = useState<ViewingItem | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +67,7 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
                 <TabButton isActive={activeTab === 'concepts'} onClick={() => setActiveTab('concepts')}>Concepts</TabButton>
                 <TabButton isActive={activeTab === 'motions'} onClick={() => setActiveTab('motions')}>Motions</TabButton>
                 <TabButton isActive={activeTab === 'routes'} onClick={() => setActiveTab('routes')}>Routes</TabButton>
+                <TabButton isActive={activeTab === 'protections'} onClick={() => setActiveTab('protections')}>Protections</TabButton>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -107,6 +114,14 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
                     onViewRoute={(name) => setViewingItem({ type: 'route', name })}
                 />
            )}
+           {activeTab === 'protections' && (
+                <ProtectionEditor
+                    protections={protections}
+                    onAddProtection={onAddProtection}
+                    onDeleteProtection={onDeleteProtection}
+                    onViewProtection={(name) => setViewingItem({ type: 'protection', name })}
+                />
+           )}
         </div>
       </div>
       {viewingItem && (
@@ -116,6 +131,7 @@ export const ConceptManager: React.FC<ConceptManagerProps> = ({
             conceptLibrary={concepts}
             motionLibrary={motions}
             routeLibrary={routes}
+            protectionLibrary={protections}
         />
       )}
     </div>
@@ -127,8 +143,8 @@ const getMirroredPath = (path: RoutePath): RoutePath => {
 };
 
 // --- Item Viewer Modal ---
-const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibrary: ConceptLibrary, motionLibrary: MotionLibrary, routeLibrary: RouteLibrary}> = 
-({ item, onClose, conceptLibrary, motionLibrary, routeLibrary }) => {
+const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibrary: ConceptLibrary, motionLibrary: MotionLibrary, routeLibrary: RouteLibrary, protectionLibrary: ProtectionLibrary}> = 
+({ item, onClose, conceptLibrary, motionLibrary, routeLibrary, protectionLibrary }) => {
     
     const studyPlay: Play | null = useMemo(() => {
         if (!item.name) return null;
@@ -147,7 +163,6 @@ const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibra
             case 'concept': {
                 const concept = conceptLibrary[item.name];
                 if (!concept) return null;
-                // Use the first compatible formation if available, otherwise default to Spread
                 const defaultFormation = (concept.compatibleFormations && concept.compatibleFormations.length > 0) 
                     ? concept.compatibleFormations[0] 
                     : 'Spread';
@@ -161,10 +176,7 @@ const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibra
                     const routeName = concept.routes[i];
                     if (receiver && routeName && routeLibrary[routeName]) {
                         let path = routeLibrary[routeName];
-                        // Mirror for left-side receivers (S and W are indices 2 and 3)
-                        if (i >= 2) {
-                            path = getMirroredPath(path);
-                        }
+                        if (i >= 2) path = getMirroredPath(path);
                         assignments[receiver] = { routeName, path };
                     }
                 }
@@ -185,10 +197,22 @@ const ItemViewer: React.FC<{item: ViewingItem, onClose: () => void, conceptLibra
                     motions: [{ receiver: motion.receiver, motionName: item.name, path: motion.path }]
                 };
             }
+            case 'protection': {
+                const protection = protectionLibrary[item.name];
+                if (!protection) return null;
+                return {
+                    playcall: `Protection: ${item.name}`,
+                    formationName: 'Spread',
+                    protectionName: item.name,
+                    protectionPaths: protection.paths,
+                    routes: {},
+                    motions: []
+                };
+            }
             default:
                 return null;
         }
-    }, [item, routeLibrary, conceptLibrary, motionLibrary]);
+    }, [item, routeLibrary, conceptLibrary, motionLibrary, protectionLibrary]);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[60] p-4" onClick={onClose}>
@@ -293,11 +317,6 @@ const ConceptEditor: React.FC<ConceptEditorProps> = ({ concepts, allRoutes, onAd
                     <div className="flex-grow pr-2">
                         <p className="font-bold text-blue-400">{name}</p>
                         <p className="text-xs text-gray-400 capitalize">{concept.category} - {concept.routes.join(', ')}</p>
-                         {concept.compatibleFormations && concept.compatibleFormations.length > 0 && (
-                            <p className="text-[10px] text-gray-500 mt-1">
-                                Formations: {concept.compatibleFormations.join(', ')}
-                            </p>
-                        )}
                     </div>
                     <div className="flex items-center space-x-6 flex-shrink-0">
                         <IconButton onClick={() => onViewConcept(name)} title="View Concept">
@@ -324,23 +343,19 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
     const [currentPath, setCurrentPath] = useState<RoutePath>([]);
     const svgRef = useRef<SVGSVGElement>(null);
 
-    const baseFormation = FORMATIONS['Spread']; // Use spread for the editor
+    const baseFormation = FORMATIONS['Spread'];
     const sortedMotions = Object.entries(motions).sort((a,b) => a[0].localeCompare(b[0]));
     
     const handleFieldClick = (e: MouseEvent<SVGSVGElement>) => {
         if (!selectedReceiver || !svgRef.current) return;
-
         const svgPoint = svgRef.current.createSVGPoint();
         svgPoint.x = e.clientX;
         svgPoint.y = e.clientY;
-
         const transformedPoint = svgPoint.matrixTransform(svgRef.current.getScreenCTM()?.inverse());
-        const YARD_SCALE = 10; // Simplified scale for editor
+        const YARD_SCALE = 10;
         const startPos = baseFormation[selectedReceiver];
-
         const relativeX = (transformedPoint.x - (startPos.x * 5)) / YARD_SCALE;
         const relativeY = ((startPos.y * 5) - transformedPoint.y) / YARD_SCALE;
-
         setCurrentPath(prev => [...prev, { x: relativeX, y: relativeY }]);
     };
     
@@ -350,7 +365,6 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
             return;
         }
         onAddMotion(newMotionName.trim(), [{x: 0, y: 0}, ...currentPath], selectedReceiver);
-        // Reset form
         setNewMotionName('');
         setSelectedReceiver(null);
         setCurrentPath([]);
@@ -358,17 +372,9 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
     
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Column 1: Add New Motion */}
         <div className="bg-gray-900 p-4 rounded-lg space-y-4">
           <h3 className="text-xl font-semibold text-yellow-300 border-b border-gray-700 pb-2">Add New Motion</h3>
           <FormInput id="motion-name" label="Motion Name" value={newMotionName} onChange={setNewMotionName} placeholder="e.g., Zap" required />
-          <div>
-            <p className="block text-sm font-medium text-gray-300 mb-2">1. Select a Receiver to Motion</p>
-            <div className="text-xs text-gray-400 mb-2">
-                Selected: <span className="font-bold text-yellow-300">{selectedReceiver || 'None'}</span>
-            </div>
-            <p className="block text-sm font-medium text-gray-300 mb-2">2. Click on the field to draw the path</p>
-          </div>
           <div className="w-full aspect-video bg-blue-900/50 border-2 border-dashed border-gray-600 rounded-lg">
             <svg ref={svgRef} className="w-full h-full" viewBox="0 0 500 500" onClick={handleFieldClick}>
                 {Object.entries(baseFormation).map(([rec, pos]) => (
@@ -389,7 +395,6 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
                 <button onClick={() => { setNewMotionName(''); setSelectedReceiver(null); setCurrentPath([]); }} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Clear</button>
             </div>
         </div>
-        {/* Column 2: Existing Motions */}
         <div className="bg-gray-900 p-4 rounded-lg flex flex-col">
           <h3 className="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Existing Motions</h3>
           <ul className="space-y-2 flex-grow overflow-y-auto pr-2 max-h-[55vh]">
@@ -397,7 +402,7 @@ const MotionEditor: React.FC<MotionEditorProps> = ({ motions, onAddMotion, onDel
               <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
                 <div>
                     <p className="font-bold text-blue-400">{name}</p>
-                    <p className="text-xs text-gray-400">For Receiver: <span className="font-semibold text-yellow-300">{motionData.receiver}</span></p>
+                    <p className="text-xs text-gray-400">For: <span className="font-semibold text-yellow-300">{motionData.receiver}</span></p>
                 </div>
                  <div className="flex items-center space-x-6">
                     <IconButton onClick={() => onViewMotion(name)} title="View Motion">
@@ -424,7 +429,6 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
     const [currentPath, setCurrentPath] = useState<Point[]>([]);
     const svgRef = useRef<SVGSVGElement>(null);
     const sortedRoutes = Object.entries(routes).sort((a, b) => a[0].localeCompare(b[0]));
-    const YARD_SCALE = 8;
     const VIEWBOX = { x: -25, y: -5, width: 50, height: 45 };
 
     const handleFieldClick = (e: MouseEvent<SVGSVGElement>) => {
@@ -432,47 +436,27 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
         const svgPoint = svgRef.current.createSVGPoint();
         svgPoint.x = e.clientX;
         svgPoint.y = e.clientY;
-
         const transformedPoint = svgPoint.matrixTransform(svgRef.current.getScreenCTM()?.inverse());
-        const relativeX = transformedPoint.x;
-        const relativeY = -transformedPoint.y; // Invert Y-axis for drawing
-        setCurrentPath(prev => [...prev, { x: relativeX, y: relativeY }]);
+        setCurrentPath(prev => [...prev, { x: transformedPoint.x, y: -transformedPoint.y }]);
     };
     
     const handleSaveRoute = () => {
         if (!newRouteName.trim() || currentPath.length === 0) {
-            alert('Please provide a name and draw a path for the route.');
+            alert('Please provide a name and draw a path.');
             return;
         }
-        // Always starts at 0,0 (LOS)
-        const finalPath = [{ x: 0, y: 0 }, ...currentPath];
-        onAddRoute(newRouteName.trim(), finalPath);
+        onAddRoute(newRouteName.trim(), [{ x: 0, y: 0 }, ...currentPath]);
         setNewRouteName('');
         setCurrentPath([]);
-    };
-
-    const handleEditRoute = (name: string) => {
-        const path = routes[name];
-        if (path) {
-            setNewRouteName(name);
-            // Remove the first point (0,0) as the editor implies it, and the drawer adds relative points
-            setCurrentPath(path.slice(1)); 
-        }
     };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-gray-900 p-4 rounded-lg space-y-4">
-                <h3 className="text-xl font-semibold text-yellow-300 border-b border-gray-700 pb-2">Add / Edit Route</h3>
-                <FormInput id="route-name" label="Route Name" value={newRouteName} onChange={setNewRouteName} placeholder="e.g., Deep Corner" required />
-                <p className="block text-sm font-medium text-gray-300">Click on the field to draw the path (starts from line of scrimmage).</p>
+                <h3 className="text-xl font-semibold text-yellow-300 border-b border-gray-700 pb-2">Add Route</h3>
+                <FormInput id="route-name" label="Route Name" value={newRouteName} onChange={setNewRouteName} placeholder="e.g., Slant" required />
                 <div className="w-full aspect-square bg-blue-900/50 border-2 border-dashed border-gray-600 rounded-lg cursor-crosshair">
                     <svg ref={svgRef} className="w-full h-full" viewBox={`${VIEWBOX.x} ${-VIEWBOX.height + VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`} onClick={handleFieldClick}>
-                        {/* Field Markings */}
-                        <line x1="0" y1={-VIEWBOX.height} x2="0" y2={VIEWBOX.y} stroke="#4b5563" strokeWidth="0.5" />
-                        {Array.from({ length: 9 }).map((_, i) => (
-                            <line key={i} x1={VIEWBOX.x} y1={-i * 5} x2={VIEWBOX.x + VIEWBOX.width} y2={-i * 5} stroke="#4b5563" strokeWidth="0.5" strokeDasharray="1 2" />
-                        ))}
                         <circle cx="0" cy="0" r="1.5" className="fill-yellow-300" />
                         {currentPath.length > 0 && (
                             <polyline points={`0,0 ${currentPath.map(p => `${p.x},${-p.y}`).join(' ')}`} className="fill-none stroke-yellow-300" strokeWidth="1" />
@@ -480,9 +464,7 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
                     </svg>
                 </div>
                 <div className="flex space-x-2">
-                    <button onClick={handleSaveRoute} className="flex-grow bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                        {routes[newRouteName] ? 'Update Route' : 'Save Route'}
-                    </button>
+                    <button onClick={handleSaveRoute} className="flex-grow bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save Route</button>
                     <button onClick={() => { setCurrentPath([]); setNewRouteName(''); }} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Clear</button>
                 </div>
             </div>
@@ -496,9 +478,6 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
                                 <IconButton onClick={() => onViewRoute(name)} title="View Route">
                                     <EyeIcon />
                                 </IconButton>
-                                <IconButton onClick={() => handleEditRoute(name)} title="Edit Route">
-                                    <PencilIcon />
-                                </IconButton>
                                 <button onClick={() => onDeleteRoute(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
                             </div>
                         </li>
@@ -509,7 +488,120 @@ const RouteEditor: React.FC<RouteEditorProps> = ({ routes, onAddRoute, onDeleteR
     );
 };
 
+// --- Protection Editor Component ---
+interface ProtectionEditorProps {
+    protections: ProtectionLibrary;
+    onAddProtection: (name: string, protection: ProtectionDefinition) => void;
+    onDeleteProtection: (name: string) => void;
+    onViewProtection: (name: string) => void;
+}
+const ProtectionEditor: React.FC<ProtectionEditorProps> = ({ protections, onAddProtection, onDeleteProtection, onViewProtection }) => {
+    const [newName, setNewName] = useState('');
+    const [selectedLineman, setSelectedLineman] = useState<string>('C');
+    const [linemanPaths, setLinemanPaths] = useState<Record<string, RoutePath>>({
+        LT: [{x:0,y:0}], LG: [{x:0,y:0}], C: [{x:0,y:0}], RG: [{x:0,y:0}], RT: [{x:0,y:0}]
+    });
+    const svgRef = useRef<SVGSVGElement>(null);
+    const sortedProtections = Object.entries(protections).sort((a,b) => a[0].localeCompare(b[0]));
+    const linemen = ['LT', 'LG', 'C', 'RG', 'RT'];
+    const LINEMAN_SPACING_YARDS = 2.2;
 
+    const handleFieldClick = (e: MouseEvent<SVGSVGElement>) => {
+        if (!svgRef.current) return;
+        const svgPoint = svgRef.current.createSVGPoint();
+        svgPoint.x = e.clientX;
+        svgPoint.y = e.clientY;
+        const transformedPoint = svgPoint.matrixTransform(svgRef.current.getScreenCTM()?.inverse());
+        
+        const idx = linemen.indexOf(selectedLineman) - 2;
+        const startX = idx * LINEMAN_SPACING_YARDS;
+        const startY = 0;
+
+        const relX = transformedPoint.x - startX;
+        const relY = -transformedPoint.y - startY;
+
+        setLinemanPaths(prev => ({
+            ...prev,
+            [selectedLineman]: [...prev[selectedLineman], { x: relX, y: relY }]
+        }));
+    };
+
+    const handleSave = () => {
+        if (!newName.trim()) return alert('Name required');
+        onAddProtection(newName.trim(), { paths: linemanPaths });
+        setNewName('');
+        setLinemanPaths({ LT: [{x:0,y:0}], LG: [{x:0,y:0}], C: [{x:0,y:0}], RG: [{x:0,y:0}], RT: [{x:0,y:0}] });
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-gray-900 p-4 rounded-lg space-y-4">
+                <h3 className="text-xl font-semibold text-yellow-300 border-b border-gray-700 pb-2">Draw Protection</h3>
+                <FormInput id="prot-name" label="Protection Name" value={newName} onChange={setNewName} placeholder="e.g., Slide Left" />
+                <div className="flex justify-center space-x-2 bg-gray-800 p-2 rounded-lg">
+                    {linemen.map(lm => (
+                        <button key={lm} onClick={() => setSelectedLineman(lm)} className={`px-3 py-1 rounded font-bold text-xs ${selectedLineman === lm ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
+                            {lm}
+                        </button>
+                    ))}
+                </div>
+                <div className="w-full aspect-[16/9] bg-blue-900/50 border-2 border-dashed border-gray-600 rounded-lg cursor-crosshair">
+                    <svg ref={svgRef} className="w-full h-full" viewBox="-15 -10 30 15" onClick={handleFieldClick}>
+                        {linemen.map((lm, i) => {
+                            const x = (i - 2) * LINEMAN_SPACING_YARDS;
+                            const path = linemanPaths[lm];
+                            
+                            // Calculate T-bar for the current path in editor
+                            let blockBarData = "";
+                            if (path.length >= 2) {
+                                const pEnd = path[path.length - 1];
+                                const pPrev = path[path.length - 2];
+                                const dx = pEnd.x - pPrev.x;
+                                const dy = -(pEnd.y - pPrev.y); // Y is inverted in the SVG coordinate space vs path yards
+                                const len = Math.sqrt(dx * dx + dy * dy);
+                                if (len > 0.01) {
+                                    const barSize = 0.8;
+                                    const px = (-dy / len) * (barSize / 2);
+                                    const py = (dx / len) * (barSize / 2);
+                                    blockBarData = `M ${x + pEnd.x - px},${-pEnd.y - py} L ${x + pEnd.x + px},${-pEnd.y + py}`;
+                                }
+                            }
+
+                            return (
+                                <g key={lm}>
+                                    <circle cx={x} cy="0" r="0.8" className={selectedLineman === lm ? "fill-yellow-300" : "fill-blue-400"} />
+                                    <text x={x} y="0.3" textAnchor="middle" fontSize="0.5" className="fill-gray-900 font-bold">{lm}</text>
+                                    <polyline points={`${x},0 ${path.map(p => `${x + p.x},${-p.y}`).join(' ')}`} className="fill-none stroke-yellow-300" strokeWidth="0.2" strokeDasharray="none" />
+                                    {blockBarData && (
+                                        <path d={blockBarData} stroke="#facc15" strokeWidth="0.2" fill="none" strokeLinecap="round" />
+                                    )}
+                                </g>
+                            )
+                        })}
+                    </svg>
+                </div>
+                <div className="flex space-x-2">
+                    <button onClick={handleSave} className="flex-grow bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Save Protection</button>
+                    <button onClick={() => setLinemanPaths({ LT: [{x:0,y:0}], LG: [{x:0,y:0}], C: [{x:0,y:0}], RG: [{x:0,y:0}], RT: [{x:0,y:0}] })} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Clear Paths</button>
+                </div>
+            </div>
+            <div className="bg-gray-900 p-4 rounded-lg flex flex-col">
+                <h3 className="text-xl font-semibold mb-4 text-yellow-300 border-b border-gray-700 pb-2">Existing Protections</h3>
+                <ul className="space-y-2 flex-grow overflow-y-auto pr-2 max-h-[55vh]">
+                    {sortedProtections.map(([name]) => (
+                        <li key={name} className="bg-gray-800 p-3 rounded-md flex justify-between items-center">
+                            <p className="font-bold text-blue-400">{name}</p>
+                            <div className="flex items-center space-x-6">
+                                <IconButton onClick={() => onViewProtection(name)} title="View"><EyeIcon /></IconButton>
+                                <button onClick={() => onDeleteProtection(name)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded-md transition-colors">Delete</button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    )
+};
 
 // --- Shared Helper Components ---
 const TabButton: React.FC<{isActive: boolean, onClick: () => void, children: React.ReactNode}> = ({ isActive, onClick, children }) => (
